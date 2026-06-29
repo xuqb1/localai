@@ -119,7 +119,7 @@ Select "Import File"
 Special the directory and filename, supported files (TXT, CSV, MD, HTML, DOCX, XLSX, etc.)
 
 Press Import button, then System automatically parses and vectorizes documents
-
+![Knowledge Manage](./image/knowledge.jpg)
 2. **Start Chatting**
 Click "New Chat" to create a session
 
@@ -128,14 +128,14 @@ Enter your question
 System retrieves from knowledge base and generates answers
 
 Answers include source references for verification
-
+![chat](./image/chat.jpg)
 3. **System Settings**
 Configure model parameters in "Settings"
 
 Switch between different LLMs
 
 Adjust temperature, max tokens, and other parameters
-
+![Setting](./image/setting.jpg)
 ## 📄 License
 This project is licensed under the MIT License.
 
@@ -144,7 +144,7 @@ If LocalAI has been helpful to you, consider supporting us!
 
 | Alipay | WeChat |
 |--------|--------|
-| https://github.com/xuqb1/localAI/image/alipay.jpg | https://github.com/xuqb1/localAI/image/wechat.jpg |
+| ![alipay](./image/alipay.jpg) | ![wechat](./image/wechat.png) |
 
 ## 📞 Contact
 Author: xuqb1
