@@ -150,10 +150,8 @@ npm run dev
 
 ### 💰 支持项目
 如果您觉得 LocalAI 对您有帮助，欢迎打赏支持！
+![支付宝](./image/alipay.jpg) ![微信](./image/wechat.png)
 
-|支付宝 | 微信 |
-|-------|------|
-|![支付宝](./image/alipay.jpg) | ![微信](./image/wechat.png) |
 
 ### 📞 联系方式
 作者：xuqb1

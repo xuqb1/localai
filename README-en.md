@@ -141,10 +141,8 @@ This project is licensed under the MIT License.
 
 ## 💰 Support the Project
 If LocalAI has been helpful to you, consider supporting us!
+ ![alipay](./image/alipay.jpg)  ![wechat](./image/wechat.png) 
 
-| Alipay | WeChat |
-|--------|--------|
-| ![alipay](./image/alipay.jpg) | ![wechat](./image/wechat.png) |
 
 ## 📞 Contact
 Author: xuqb1
