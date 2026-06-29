@@ -124,7 +124,7 @@ npm run dev
 
 单击导入，系统自动解析并向量化文档
 
-[知识库管理](https://github.com/xuqb1/localAI/image/knowledge.jpg)
+[知识库管理](https://github.com/xuqb1/localai/image/knowledge.jpg)
 
 2. **开始对话**
 点击「新对话」创建会话
@@ -135,7 +135,7 @@ npm run dev
 
 回答会标注来源，方便验证
 
-[对话](https://github.com/xuqb1/localAI/image/chat.jpg)
+[对话](https://github.com/xuqb1/localai/image/chat.jpg)
 
 3. 系统设置
 在「设置」页面配置模型参数
@@ -153,7 +153,7 @@ npm run dev
 
 |支付宝 | 微信 |
 |-------|------|
-|[支付宝](https://github.com/xuqb1/localAI/image/alipay.jpg) | [微信](https://github.com/xuqb1/localAI/image/wechat.jpg) |
+|[支付宝](https://github.com/xuqb1/localai/image/alipay.jpg) | [微信](https://github.com/xuqb1/localai/image/wechat.png) |
 
 ### 📞 联系方式
 作者：xuqb1
