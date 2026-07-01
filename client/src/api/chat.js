@@ -9,25 +9,13 @@ export const chatApi = {
     return axios.get(`/chat/history/${id}`)
   },
 
-  async sendMessage(data) {
-    // return fetch('/api/chat', {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify(data),
-    // })
-    console.log('发送消息请求:', data)
+  sendMessage(data) {
     return fetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
-    }).then(response => {
-      console.log('响应状态:', response.status, response.statusText)
-      console.log('响应头:', response.headers)
-      return response
     })
   },
 

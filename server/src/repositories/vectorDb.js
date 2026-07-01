@@ -12,8 +12,9 @@ class VectorRepository {
     this.documents = new Map()
     this.embeddingIndexMap = new Map()
     this.dimensions = 384
-    this.maxElements = 10000
+    this.maxElements = 1000000
     this.saveInterval = null
+    this.isBatchMode = false
   }
 
   async init() {
@@ -79,7 +80,58 @@ class VectorRepository {
       this.embeddingIndexMap.set(startIdx + i, chunkId)
     }
 
-    this.scheduleSave()
+    if (!this.isBatchMode) {
+      this.scheduleSave()
+    }
+    return chunks.length
+  }
+
+  async startBatchMode() {
+    this.isBatchMode = true
+  }
+
+  async endBatchMode() {
+    this.isBatchMode = false
+    await this.save()
+  }
+
+  async addDocumentsBatch(docId, title, chunks, metadata = {}) {
+    if (!this.index) {
+      await this.init()
+    }
+
+    if (!this.index) {
+      return 0
+    }
+
+    const startIdx = this.documents.size
+    const embeddings = []
+    
+    for (let i = 0; i < chunks.length; i++) {
+      embeddings.push(this.encodeSync(chunks[i]))
+    }
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunkId = `${docId}_${startIdx + i}`
+      this.index.addPoint(embeddings[i], startIdx + i)
+      
+      const docData = {
+        id: chunkId,
+        document_id: docId,
+        title,
+        content: chunks[i],
+        chunk_index: startIdx + i,
+        file_path: metadata.filePath || '',
+        file_type: metadata.fileType || '',
+        embedding_index: startIdx + i,
+      }
+      this.documents.set(chunkId, docData)
+      this.embeddingIndexMap.set(startIdx + i, chunkId)
+    }
+
+    if (!this.isBatchMode) {
+      this.scheduleSave()
+    }
     return chunks.length
   }
 

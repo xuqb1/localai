@@ -4,6 +4,7 @@ import { DocumentRepository } from '../repositories/index.js'
 import vectorDb from '../repositories/vectorDb.js'
 import fs from 'fs'
 import path from 'path'
+import { taskManager } from '../utils/taskManager.js'
 
 const router = Router()
 const ragService = new RAGService()
@@ -92,35 +93,19 @@ function getAllFiles(dir, supportedExts) {
   return results
 }
 
-router.post('/documents/import-file1', async (req, res) => {
+router.get('/documents/import-task/:taskId', async (req, res) => {
   try {
-    const { folderPath, fileName } = req.body
-
-    if (!folderPath || !fileName) {
-      return res.status(400).json({ error: '文件夹路径和文件名不能为空' })
-    }
-
-    const filePath = path.join(folderPath, fileName)
-    const ext = path.extname(fileName).toLowerCase()
-
-    let result
-    if (ext === '.csv') {
-      result = await ragService.addCsvDocumentByLines(filePath)
-    } else {
-      result = await ragService.addDocument(filePath)
+    const { taskId } = req.params
+    const task = taskManager.getTask(taskId)
+    
+    if (!task) {
+      return res.status(404).json({ error: '任务不存在' })
     }
     
-    res.json({
-      success: true,
-      id: result.id,
-      title: result.title,
-      message: ext === '.csv' 
-        ? `CSV文件 "${fileName}" 导入成功，共 ${result.chunkCount} 行` 
-        : `文件 "${fileName}" 导入成功`,
-    })
+    res.json(task)
   } catch (e) {
-    console.error('导入文件错误:', e)
-    res.status(500).json({ error: e.message || '导入过程中发生错误' })
+    console.error('查询任务状态错误:', e)
+    res.status(500).json({ error: e.message || '查询任务状态失败' })
   }
 })
 
@@ -135,66 +120,39 @@ router.post('/documents/import-file', async (req, res) => {
     const filePath = path.join(folderPath, fileName)
     const ext = path.extname(fileName).toLowerCase()
 
-    // 获取文件大小
-    const stats = fs.statSync(filePath)
-    const fileSizeMB = stats.size / (1024 * 1024)
-    const isLargeFile = fileSizeMB > 100
+    const task = taskManager.createTask('import_file', {
+      folderPath,
+      fileName,
+      filePath,
+      fileType: ext,
+    })
 
-    // 如果是大文件，先返回处理中状态
-    if (isLargeFile) {
-      // 立即返回响应
-      res.json({
-        success: true,
-        message: `文件 "${fileName}" 正在后台处理，请稍后查询结果`,
-        fileSize: `${fileSizeMB.toFixed(2)} MB`,
-        status: 'processing'
+    taskManager.executeTask(task.id, async (taskId, updateProgress) => {
+      updateProgress(0, `开始导入文件: ${fileName}`)
+      
+      let result
+      if (ext === '.csv') {
+        result = await ragService.addCsvDocumentByLines(filePath, (progress, msg) => {
+          updateProgress(progress, msg)
+        })
+      } else {
+        result = await ragService.addDocument(filePath)
+      }
+      
+      taskManager.updateTask(taskId, {
+        status: 'completed',
+        progress: 100,
+        message: ext === '.csv' 
+          ? `CSV文件 "${fileName}" 导入成功，共 ${result.chunkCount} 行` 
+          : `文件 "${fileName}" 导入成功`,
+        result,
       })
-
-      // 异步处理文件（不阻塞响应）
-      setImmediate(async () => {
-        try {
-          let result
-          if (ext === '.csv') {
-            result = await ragService.addCsvDocumentByLines(filePath)
-          } else {
-            result = await ragService.addDocument(filePath)
-          }
-          
-          console.log(`大文件处理完成: ${fileName}`, {
-            id: result.id,
-            chunkCount: result.chunkCount
-          })
-          
-          // 这里可以添加通知机制，比如：
-          // - 将结果保存到数据库，供后续查询
-          // - 发送WebSocket通知
-          // - 发送邮件通知
-          // - 更新任务状态表
-          
-        } catch (error) {
-          console.error(`大文件处理失败: ${fileName}`, error)
-          // 记录错误，方便后续排查
-        }
-      })
-
-      return // 提前返回，不执行后续代码
-    }
-
-    // 小文件正常同步处理
-    let result
-    if (ext === '.csv') {
-      result = await ragService.addCsvDocumentByLines(filePath)
-    } else {
-      result = await ragService.addDocument(filePath)
-    }
+    })
     
     res.json({
       success: true,
-      id: result.id,
-      title: result.title,
-      message: ext === '.csv' 
-        ? `CSV文件 "${fileName}" 导入成功，共 ${result.chunkCount} 行` 
-        : `文件 "${fileName}" 导入成功`,
+      taskId: task.id,
+      message: '导入任务已提交，请稍后查询任务状态',
     })
   } catch (e) {
     console.error('导入文件错误:', e)

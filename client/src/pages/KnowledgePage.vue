@@ -92,13 +92,35 @@ async function handleImportFile() {
  showImportFileModal.value = false;
  importFolderPath.value = '';
  importFileName.value = '';
- showToast('success', result.message || '文件导入成功');
- await documentStore.fetchDocuments();
+ showToast('success', result.message || '导入任务已提交');
+ 
+ if (result.taskId) {
+ await pollTaskStatus(result.taskId);
+ }
  } catch (e) {
  showToast('error', '文件导入失败：' + e.message);
  } finally {
  isImporting.value = false;
  }
+}
+async function pollTaskStatus(taskId) {
+ let pollInterval = setInterval(async () => {
+ try {
+ const task = await documentsApi.getImportTask(taskId);
+ if (task.status === 'completed') {
+ clearInterval(pollInterval);
+ showToast('success', task.message || '导入完成');
+ await documentStore.fetchDocuments();
+ } else if (task.status === 'failed') {
+ clearInterval(pollInterval);
+ showToast('error', task.message || '导入失败');
+ } else if (task.status === 'running') {
+ console.log(`导入进度: ${task.progress}% - ${task.message}`);
+ }
+ } catch (e) {
+ console.error('查询任务状态失败:', e);
+ }
+ }, 3000);
 }
 async function handleView(doc) {
  currentDoc.value = doc;

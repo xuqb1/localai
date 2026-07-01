@@ -74,7 +74,7 @@ export class RAGService {
     }
   }
 
-  async addCsvDocumentByLines(filePath) {
+  async addCsvDocumentByLines(filePath, onProgress) {
     const existingDoc = this.documentRepository.findByFilePath(filePath)
     if (existingDoc) {
       await vectorDb.deleteByDocumentId(existingDoc.id)
@@ -105,9 +105,17 @@ export class RAGService {
     const readline = await import('readline')
     const fs = await import('fs')
     
+    const stat = fs.default.statSync(filePath)
+    const totalSize = stat.size
+    
     let count = 0
     let lineNum = 0
     let headers = []
+    let bytesRead = 0
+    let batchLines = []
+    const batchSize = 1000
+    
+    await vectorDb.startBatchMode()
     
     const rl = readline.createInterface({
       input: fs.default.createReadStream(filePath),
@@ -115,6 +123,7 @@ export class RAGService {
     })
     
     for await (const line of rl) {
+      bytesRead += line.length + 2
       const trimmedLine = line.trim()
       if (!trimmedLine) continue
       
@@ -125,19 +134,36 @@ export class RAGService {
       } else {
         const lineText = parts.join(' ')
         if (lineText && lineText.trim().length > 0) {
-          await vectorDb.addDocuments(
-            doc.id,
-            title,
-            [lineText],
-            { filePath, fileType: 'csv', lineIndex: lineNum }
-          )
-          count++
+          batchLines.push(lineText)
         }
       }
+      
+      if (batchLines.length >= batchSize) {
+        await vectorDb.addDocumentsBatch(doc.id, title, batchLines, { filePath, fileType: 'csv' })
+        count += batchLines.length
+        batchLines = []
+        
+        if (onProgress) {
+          const progress = Math.min(95, Math.round((bytesRead / totalSize) * 100))
+          onProgress(progress, `已处理 ${count} 行`)
+        }
+      }
+      
       lineNum++
     }
+    
+    if (batchLines.length > 0) {
+      await vectorDb.addDocumentsBatch(doc.id, title, batchLines, { filePath, fileType: 'csv' })
+      count += batchLines.length
+    }
+    
+    await vectorDb.endBatchMode()
 
     this.documentRepository.updateChunkCount(doc.id, count)
+    
+    if (onProgress) {
+      onProgress(100, `导入完成，共 ${count} 行`)
+    }
 
     return {
       ...doc,

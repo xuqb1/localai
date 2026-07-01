@@ -37,4 +37,8 @@ export const documentsApi = {
   importFile(data) {
     return axios.post('/documents/import-file', data)
   },
+
+  getImportTask(taskId) {
+    return axios.get(`/documents/import-task/${taskId}`)
+  },
 }
