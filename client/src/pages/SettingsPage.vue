@@ -45,6 +45,9 @@ const modelOptions = computed(() => {
 onMounted(async () => {
   await settingsStore.fetchSettings()
   localSettings.value = { ...settingsStore.settings }
+  // 从已保存的设置中恢复模型列表
+  deepseekModels.value = localSettings.value.deepseekModels || []
+  agnesModels.value = localSettings.value.agnesModels || []
 })
 
 function showToast(type, content) {
@@ -71,6 +74,7 @@ async function fetchAgnesModels() {
     })
     const data = await result.json()
     agnesModels.value = data.models || []
+    localSettings.value.agnesModels = data.models || []
     showToast('success', '模型列表获取成功')
   } catch (e) {
     showToast('error', '获取模型列表失败：' + e.message)
@@ -97,6 +101,7 @@ async function fetchDeepseekModels() {
     })
     const data = await result.json()
     deepseekModels.value = data.models || []
+    localSettings.value.deepseekModels = data.models || []
     showToast('success', '模型列表获取成功')
   } catch (e) {
     showToast('error', '获取模型列表失败：' + e.message)
@@ -252,7 +257,7 @@ async function handleSave() {
               <button
                 @click="fetchDeepseekModels"
                 :disabled="isFetchingDeepseekModels"
-                class="flex items-center gap-1 px-3 py-1 text-xs bg-cyan-500 hover:bg-cyan-600 text-gray-800 rounded-lg transition-all disabled:opacity-50"
+                class="flex items-center gap-1 px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all disabled:opacity-50"
               >
                 <RefreshCw :size="14" :class="{ 'animate-spin': isFetchingDeepseekModels }" />
                 获取模型列表
@@ -314,7 +319,7 @@ async function handleSave() {
               <button
                 @click="fetchAgnesModels"
                 :disabled="isFetchingAgnesModels"
-                class="flex items-center gap-1 px-3 py-1 text-xs bg-cyan-500 hover:bg-cyan-600 text-gray-800 rounded-lg transition-all disabled:opacity-50"
+                class="flex items-center gap-1 px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all disabled:opacity-50"
               >
                 <RefreshCw :size="14" :class="{ 'animate-spin': isFetchingAgnesModels }" />
                 获取模型列表
@@ -344,7 +349,7 @@ async function handleSave() {
         </h2>
         <button
           @click="showCustomProviderModal = true"
-          class="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-gray-800 rounded-lg transition-all"
+          class="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all"
         >
           <Plus :size="18" />
           添加供应商
@@ -437,7 +442,7 @@ async function handleSave() {
     <div class="mt-6 flex justify-end">
       <button 
         @click="handleSave"
-        class="flex items-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-gray-800 rounded-lg transition-all"
+        class="flex items-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all"
       >
         <Save :size="18" />
         保存设置
@@ -499,7 +504,7 @@ async function handleSave() {
               <button
                 @click="fetchCustomProviderModels"
                 :disabled="isFetchingCustomModels"
-                class="flex items-center gap-1 px-3 py-1 text-xs bg-cyan-500 hover:bg-cyan-600 text-gray-800 rounded-lg transition-all disabled:opacity-50"
+                class="flex items-center gap-1 px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all disabled:opacity-50"
               >
                 <RefreshCw :size="14" :class="{ 'animate-spin': isFetchingCustomModels }" />
                 获取模型列表
@@ -526,7 +531,7 @@ async function handleSave() {
           </button>
           <button
             @click="addCustomProvider"
-            class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-gray-800 rounded-lg transition-all"
+            class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all"
           >
             {{ editingProviderIndex >= 0 ? '保存' : '添加' }}
           </button>

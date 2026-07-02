@@ -174,6 +174,8 @@ export class SettingsRepository {
       deepseekApiUrl: settings.deepseek_api_url || 'https://api.deepseek.com',
       deepseekModel: settings.deepseek_model || 'deepseek-chat',
       customProviders: settings.custom_providers ? JSON.parse(settings.custom_providers) : [],
+      deepseekModels: settings.deepseek_models ? JSON.parse(settings.deepseek_models) : [],
+      agnesModels: settings.agnes_models ? JSON.parse(settings.agnes_models) : [],
       defaultModel: settings.default_model || 'deepseek',
       temperature: settings.temperature || 0.7,
       maxTokens: settings.max_tokens || 4096,
@@ -187,7 +189,8 @@ export class SettingsRepository {
       UPDATE settings 
       SET agnes_api_key = ?, agnes_api_url = ?, agnes_model = ?,
           deepseek_api_key = ?, deepseek_api_url = ?, deepseek_model = ?,
-          custom_providers = ?, default_model = ?, 
+          custom_providers = ?, deepseek_models = ?, agnes_models = ?,
+          default_model = ?, 
           temperature = ?, max_tokens = ?, vector_db_path = ?, updated_at = ?
       WHERE id = 1
     `).run([
@@ -198,6 +201,8 @@ export class SettingsRepository {
       settings.deepseekApiUrl || 'https://api.deepseek.com',
       settings.deepseekModel || 'deepseek-chat',
       JSON.stringify(settings.customProviders || []),
+      JSON.stringify(settings.deepseekModels || []),
+      JSON.stringify(settings.agnesModels || []),
       settings.defaultModel || 'deepseek',
       settings.temperature || 0.7,
       settings.maxTokens || 4096,

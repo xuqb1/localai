@@ -106,6 +106,14 @@ try {
   db.exec('ALTER TABLE settings ADD COLUMN custom_providers TEXT DEFAULT "[]"')
 } catch (e) {}
 
+try {
+  db.exec('ALTER TABLE settings ADD COLUMN deepseek_models TEXT DEFAULT "[]"')
+} catch (e) {}
+
+try {
+  db.exec('ALTER TABLE settings ADD COLUMN agnes_models TEXT DEFAULT "[]"')
+} catch (e) {}
+
 const checkSettings = db.prepare('SELECT COUNT(*) as count FROM settings')
 const result = checkSettings.get()
 if (result.count === 0) {
