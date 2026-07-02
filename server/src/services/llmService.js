@@ -75,7 +75,8 @@ export class LLMService {
       streaming = true, 
       settings = null,
       timeout = 120000, // 默认120秒，可配置
-      maxRetries = 3 // 增加重试次数
+      maxRetries = 3, // 增加重试次数
+      conversationHistory = [], // 对话历史上下文
     } = options
     
     const provider = this.getProvider(model, settings)
@@ -84,15 +85,19 @@ export class LLMService {
       throw new Error(`模型 ${model} 的 API Key 未配置`)
     }
 
+    // 构建消息列表：系统提示 + 历史对话 + 当前问题
     const messages = [
-      { role: 'system', content: `你是一个专业的AI助手，拥有广泛的知识和强大的推理能力。你的回答应该：
+      { role: 'system', content: `你是 LocalAI，一个专业的AI助手，基于 ${provider.model} 模型运行。
+你拥有广泛的知识和强大的推理能力。你的回答应该：
 1. 优先使用提供的参考信息（如果相关）
 2. 结合你自身的知识来补充和扩展
 3. 如果参考信息不完整或没有相关信息，请自由使用你的知识来回答
-4. 回答要自然、友好、详细
+4. 回答要自然、友好、详细，每次尽量提供丰富有用的内容
 5. 不要提及"根据参考信息"、"根据提供的内容"等字眼
-6. 将知识库信息和你的知识自然融合，让用户感觉是一个完整的回答`   
+6. 将知识库信息和你的知识自然融合，让用户感觉是一个完整的回答
+7. 当用户询问你的身份或模型时，诚实地告诉用户你是基于 ${provider.model} 模型的AI助手`   
       },
+      ...conversationHistory,
       { role: 'user', content: prompt },
     ]
 
@@ -230,13 +235,15 @@ export class LLMService {
     }
 
     const messages = [
-      { role: 'system', content: `你是一个专业的AI助手，拥有广泛的知识和强大的推理能力。你的回答应该：
+      { role: 'system', content: `你是 LocalAI，一个专业的AI助手，基于 ${provider.model} 模型运行。
+你拥有广泛的知识和强大的推理能力。你的回答应该：
 1. 优先使用提供的参考信息（如果相关）
 2. 结合你自身的知识来补充和扩展
 3. 如果参考信息不完整或没有相关信息，请自由使用你的知识来回答
 4. 回答要自然、友好、详细
 5. 不要提及"根据参考信息"、"根据提供的内容"等字眼
-6. 将知识库信息和你的知识自然融合，让用户感觉是一个完整的回答`  
+6. 将知识库信息和你的知识自然融合，让用户感觉是一个完整的回答
+7. 当用户询问你的身份或模型时，诚实地告诉用户你是基于 ${provider.model} 模型的AI助手`  
       },
       { role: 'user', content: prompt },
     ]

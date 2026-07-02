@@ -36,6 +36,13 @@ router.post('/chat', async (req, res) => {
       conversation = conversationRepository.create('新对话', conversationId)
     }
 
+    // 先获取对话历史（不包含当前消息），再存储当前消息
+    const historyMessages = messageRepository.findByConversationId(conversationId)
+    const recentHistory = historyMessages.slice(-19).map(msg => ({
+      role: msg.role,
+      content: msg.content,
+    }))
+
     messageRepository.create(conversationId, 'user', message)
 
     const knowledgeResult = await ragService.retrieveKnowledge(message)
@@ -87,6 +94,7 @@ ${knowledgeResult.context}
       maxTokens: settings.maxTokens,
       streaming: true,
       settings,
+      conversationHistory: recentHistory,
     })
 
     const decoder = new TextDecoder('utf-8', { stream: true })
