@@ -95,6 +95,7 @@ ${knowledgeResult.context}
       }
     }, 15000)
 
+    console.log('调用 LLM 服务, prompt 长度:', prompt.length, ', 历史条数:', recentHistory.length)
     const llmResponse = await llmService.generateResponse(prompt, {
       model: targetModel,
       temperature: settings.temperature,
@@ -103,6 +104,7 @@ ${knowledgeResult.context}
       settings,
       conversationHistory: recentHistory,
     })
+    console.log('LLM 响应状态:', llmResponse.status, ', 流式:', typeof llmResponse.data?.pipe === 'function' || typeof llmResponse.data?.on === 'function')
 
     // 监听上游流错误
     let upstreamError = null
@@ -114,9 +116,12 @@ ${knowledgeResult.context}
     const decoder = new TextDecoder('utf-8', { stream: true })
     let buffer = ''
 
+    let chunkCount = 0
     try {
       for await (const chunk of llmResponse.data) {
+        chunkCount++
         const text = decoder.decode(chunk, { stream: true })
+        console.log(`[流式] 块 #${chunkCount}, 大小=${chunk.length}B, 文本长=${text.length}`)
         buffer += text
 
         // 按行分割，保留不完整的行在 buffer 中
@@ -127,7 +132,7 @@ ${knowledgeResult.context}
           if (line.startsWith('data: ')) {
             const dataStr = line.slice(6).trim()
             if (dataStr === '[DONE]') {
-              console.log('LLM 流式响应完成 [DONE]')
+              console.log('LLM 流式响应完成 [DONE], 已接收', chunkCount, '个数据块, 内容:', fullContent.length, '字符')
               continue
             }
             try {
@@ -149,6 +154,7 @@ ${knowledgeResult.context}
                 const content = delta.content || ''
                 if (content) {
                   fullContent += content
+                  console.log('[流式] 内容增量:', JSON.stringify(content))
                   if (res.writable) {
                     res.write(`data: ${JSON.stringify({
                       content,
@@ -156,12 +162,15 @@ ${knowledgeResult.context}
                       sources,
                     })}\n\n`)
                   }
+                } else {
+                  // delta 可能包含 role 信息（某些 API 首块）
+                  if (delta.role) console.log('[流式] role delta:', delta.role)
                 }
               }
               // 记录异常的 finish_reason
               const finishReason = data.choices?.[0]?.finish_reason
-              if (finishReason && finishReason !== 'stop' && finishReason !== 'length') {
-                console.warn('异常 finish_reason:', finishReason)
+              if (finishReason) {
+                console.log('[流式] finish_reason:', finishReason)
               }
             } catch (e) {
               console.error('解析流式响应失败:', e, '原始数据:', dataStr.substring(0, 200))
@@ -169,8 +178,9 @@ ${knowledgeResult.context}
           }
         }
       }
+      console.log('[流式] 循环结束, 共接收', chunkCount, '个数据块')
     } catch (streamErr) {
-      console.error('流式读取异常:', streamErr.message)
+      console.error('[流式] 读取异常:', streamErr.message, streamErr.stack)
       if (res.writable) {
         res.write(`data: ${JSON.stringify({
           content: '',

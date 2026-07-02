@@ -10,7 +10,9 @@ export const chatApi = {
   },
 
   sendMessage(data, signal) {
-    return fetch('/api/chat', {
+    // 聊天请求直连后端，绕过 Vite 代理避免 SSE 缓冲
+    const baseUrl = import.meta.env.DEV ? 'http://localhost:3001' : ''
+    return fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
