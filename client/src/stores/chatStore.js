@@ -122,24 +122,40 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      // 用 WritableStream 消费 SSE 数据——不依赖 ReadableStream 的 async 迭代
+      // 用 getReader 循环读取 ReadableStream，逐块解析 SSE
       const body = response.body
       if (!body) {
         throw new Error('浏览器不支持流式读取')
       }
 
-      await body
-        .pipeThrough(new TextDecoderStream('utf-8'))
-        .pipeTo(new WritableStream({
-          write(text) {
-            buffer += text
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ''
-            for (const line of lines) {
-              processLine(line.trim())
-            }
-          },
-        }))
+      const reader = body.getReader()
+      const decoder = new TextDecoder('utf-8', { stream: true })
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            processLine(line.trim())
+          }
+        }
+        // 流结束后 flush decoder 中残留的字节
+        const flushText = decoder.decode()
+        if (flushText) {
+          buffer += flushText
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            processLine(line.trim())
+          }
+        }
+      } finally {
+        reader.releaseLock()
+      }
 
       // 处理残留 buffer
       const residual = buffer.trim()
