@@ -135,7 +135,7 @@ function showToast(type, content) {
       <div class="flex items-center gap-4">
         <button 
           @click="handleNewConversation"
-          class="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-gray-800 rounded-lg transition-all"
+          class="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all"
         >
           <Plus :size="18" />
           新对话
@@ -233,7 +233,7 @@ function showToast(type, content) {
           </button>
           <button 
             @click="handleRename"
-            class="flex-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-gray-800 rounded-lg transition-all"
+            class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all"
           >
             确定
           </button>
