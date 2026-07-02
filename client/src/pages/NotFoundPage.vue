@@ -7,7 +7,7 @@
     </p>
     <router-link
       to="/"
-      class="flex items-center gap-2 px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-gray-800 rounded-lg transition-all font-medium"
+      class="flex items-center gap-2 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all font-medium"
     >
       返回首页
     </router-link>

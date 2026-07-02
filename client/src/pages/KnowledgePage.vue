@@ -271,7 +271,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
         <button 
           @click="showImportModal = true"
           :disabled="isImporting"
-          class="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-700 text-gray-800 rounded-lg transition-all"
+          class="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 text-white rounded-lg transition-all"
         >
           <FolderOpen :size="18" />
           导入目录
@@ -279,7 +279,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
         <button 
           @click="showImportFileModal = true"
           :disabled="isImporting"
-          class="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-green-700 text-white rounded-lg transition-all"
+          class="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 text-white rounded-lg transition-all"
         >
           <Upload :size="18" />
           导入文件
@@ -450,7 +450,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
           <button 
             @click="handleImport"
             :disabled="isImporting"
-            class="flex-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:bg-cyan-700 disabled:cursor-not-allowed text-white rounded-lg transition-all flex items-center justify-center gap-2"
+            class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed text-white rounded-lg transition-all flex items-center justify-center gap-2"
           >
             <Loader2 v-if="isImporting" :size="16" class="animate-spin" />
             {{ isImporting ? '导入中...' : '导入' }}
@@ -576,7 +576,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
           </button>
           <button 
             @click="handleSaveEdit"
-            class="flex-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-all flex items-center justify-center gap-2"
+            class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all flex items-center justify-center gap-2"
           >
             <Save :size="16" />
             保存

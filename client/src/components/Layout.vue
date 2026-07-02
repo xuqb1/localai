@@ -41,7 +41,7 @@ function toggleCollapse() {
               class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all"
               :class="[
                 route.path === item.path
-                  ? 'bg-cyan-500 text-gray-800'
+                  ? 'bg-slate-600 text-gray-200'
                   : 'text-slate-300 hover:bg-slate-700'
               ]"
             >
