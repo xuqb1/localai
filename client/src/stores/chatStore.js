@@ -70,71 +70,66 @@ export const useChatStore = defineStore('chat', () => {
     abortController = new AbortController()
 
     try {
-      // 使用 XHR 的 onprogress 读取 SSE 流式数据
-      // （比 fetch ReadableStream 更可靠，不会提前截断）
+      const response = await chatApi.sendMessage({
+        message,
+        conversationId: currentConversationId.value,
+      }, abortController.signal)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      // 用 async 迭代器读取 ReadableStream——现代浏览器原生支持
+      const decoder = new TextDecoder('utf-8', { stream: true })
       let buffer = ''
-      let lastIndex = 0
       let assistantContent = ''
       let assistantMessage = null
 
-      const xhr = await chatApi.sendMessage(
-        {
-          message,
-          conversationId: currentConversationId.value,
-        },
-        abortController.signal,
-        // onProgress 回调：在 send() 之前绑定，确保每次收到数据都触发
-        function () {
-          const newText = this.responseText.substring(lastIndex)
-          lastIndex = this.responseText.length
+      for await (const chunk of response.body) {
+        const text = decoder.decode(chunk, { stream: true })
+        buffer += text
 
-          buffer += newText
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
 
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            try {
-              const data = JSON.parse(line.slice(6).trim())
-              if (data.content) {
-                assistantContent += data.content
-                if (!assistantMessage) {
-                  assistantMessage = {
-                    id: (Date.now() + 1).toString(),
-                    role: 'assistant',
-                    content: '',
-                    sourceType: data.source_type || 'llm',
-                    sources: data.sources || [],
-                    createdAt: new Date().toISOString(),
-                  }
-                  messages.value.push(assistantMessage)
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const data = JSON.parse(line.slice(6).trim())
+            if (data.content) {
+              assistantContent += data.content
+              if (!assistantMessage) {
+                assistantMessage = {
+                  id: (Date.now() + 1).toString(),
+                  role: 'assistant',
+                  content: '',
+                  sourceType: data.source_type || 'llm',
+                  sources: data.sources || [],
+                  createdAt: new Date().toISOString(),
                 }
-                assistantMessage.content = assistantContent
-                assistantMessage.sourceType = data.source_type || 'llm'
+                messages.value.push(assistantMessage)
               }
-              if (data.error) {
-                error.value = data.error
-                if (!assistantMessage) {
-                  assistantMessage = {
-                    id: (Date.now() + 1).toString(),
-                    role: 'assistant',
-                    content: '',
-                    sourceType: 'error',
-                    createdAt: new Date().toISOString(),
-                  }
-                  messages.value.push(assistantMessage)
-                }
-                assistantMessage.content = assistantContent + `\n\n⚠️ 错误: ${data.error}`
-              }
-            } catch (_) {
-              // 忽略无法解析的 SSE 行
+              assistantMessage.content = assistantContent
+              assistantMessage.sourceType = data.source_type || 'llm'
             }
+            if (data.error) {
+              error.value = data.error
+              if (!assistantMessage) {
+                assistantMessage = {
+                  id: (Date.now() + 1).toString(),
+                  role: 'assistant',
+                  content: '',
+                  sourceType: 'error',
+                  createdAt: new Date().toISOString(),
+                }
+                messages.value.push(assistantMessage)
+              }
+              assistantMessage.content = assistantContent + `\n\n⚠️ 错误: ${data.error}`
+            }
+          } catch (_) {
+            // 忽略无法解析的 SSE 行
           }
         }
-      )
-
-      if (xhr.status < 200 || xhr.status >= 300) {
-        throw new Error(`HTTP ${xhr.status}: ${xhr.statusText}`)
       }
 
       // 处理残留 buffer
@@ -151,7 +146,6 @@ export const useChatStore = defineStore('chat', () => {
       if (assistantMessage) {
         assistantMessage.sourceType = assistantMessage.sourceType || 'llm'
       } else {
-        // 没有收到助手回复，添加错误消息
         messages.value.push({
           id: (Date.now() + 1).toString(),
           role: 'assistant',
