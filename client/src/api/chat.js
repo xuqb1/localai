@@ -12,7 +12,8 @@ export const chatApi = {
   sendMessage(data, signal, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
-      xhr.open('POST', '/api/chat')
+      // 直连后端 3001 端口，绕过 Vite 代理，排除代理缓冲/压缩干扰
+      xhr.open('POST', 'http://localhost:3001/api/chat')
       xhr.setRequestHeader('Content-Type', 'application/json')
 
       // 必须在 send() 之前绑定 onprogress，否则事件丢失
