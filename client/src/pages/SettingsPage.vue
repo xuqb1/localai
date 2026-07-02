@@ -23,6 +23,7 @@ const customProviderForm = ref({
   apiKey: '',
   apiUrl: '',
   model: '',
+  models: [],
 })
 const customProviderModels = ref([])
 const isFetchingCustomModels = ref(false)
@@ -128,6 +129,7 @@ async function fetchCustomProviderModels() {
     })
     const data = await result.json()
     customProviderModels.value = data.models || []
+    customProviderForm.value.models = data.models || []
     showToast('success', '模型列表获取成功')
   } catch (e) {
     showToast('error', '获取模型列表失败：' + e.message)
@@ -162,6 +164,7 @@ function addCustomProvider() {
       apiKey: customProviderForm.value.apiKey,
       apiUrl: customProviderForm.value.apiUrl,
       model: customProviderForm.value.model,
+      models: customProviderForm.value.models || [],
     }
     
     showToast('success', '自定义供应商修改成功')
@@ -177,12 +180,13 @@ function addCustomProvider() {
       apiKey: customProviderForm.value.apiKey,
       apiUrl: customProviderForm.value.apiUrl,
       model: customProviderForm.value.model,
+      models: customProviderForm.value.models || [],
     })
     
     showToast('success', '自定义供应商添加成功')
   }
   
-  customProviderForm.value = { name: '', apiKey: '', apiUrl: '', model: '' }
+  customProviderForm.value = { name: '', apiKey: '', apiUrl: '', model: '', models: [] }
   customProviderModels.value = []
   showCustomProviderModal.value = false
   editingProviderIndex.value = -1
@@ -190,8 +194,8 @@ function addCustomProvider() {
 
 function editCustomProvider(index) {
   const provider = localSettings.value.customProviders[index]
-  customProviderForm.value = { ...provider }
-  customProviderModels.value = [{ id: provider.model, name: provider.model }]
+  customProviderForm.value = { ...provider, models: provider.models || [] }
+  customProviderModels.value = provider.models || [{ id: provider.model, name: provider.model }]
   editingProviderIndex.value = index
   showCustomProviderModal.value = true
 }
