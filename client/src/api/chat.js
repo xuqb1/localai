@@ -9,11 +9,16 @@ export const chatApi = {
     return axios.get(`/chat/history/${id}`)
   },
 
-  sendMessage(data, signal) {
+  sendMessage(data, signal, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       xhr.open('POST', '/api/chat')
       xhr.setRequestHeader('Content-Type', 'application/json')
+
+      // 必须在 send() 之前绑定 onprogress，否则数据到了也不触发
+      if (onProgress) {
+        xhr.onprogress = onProgress
+      }
 
       // 支持 AbortController 取消
       if (signal) {

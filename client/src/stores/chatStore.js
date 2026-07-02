@@ -72,74 +72,69 @@ export const useChatStore = defineStore('chat', () => {
     try {
       // 使用 XHR 的 onprogress 读取 SSE 流式数据
       // （比 fetch ReadableStream 更可靠，不会提前截断）
-      const xhr = await chatApi.sendMessage({
-        message,
-        conversationId: currentConversationId.value,
-      }, abortController.signal)
-
-      if (xhr.status < 200 || xhr.status >= 300) {
-        throw new Error(`HTTP ${xhr.status}: ${xhr.statusText}`)
-      }
-
       let buffer = ''
       let lastIndex = 0
       let assistantContent = ''
       let assistantMessage = null
 
-      // onprogress 在每次收到数据块时触发，实时解析
-      xhr.onprogress = () => {
-        const newText = xhr.responseText.substring(lastIndex)
-        lastIndex = xhr.responseText.length
+      const xhr = await chatApi.sendMessage(
+        {
+          message,
+          conversationId: currentConversationId.value,
+        },
+        abortController.signal,
+        // onProgress 回调：在 send() 之前绑定，确保每次收到数据都触发
+        function () {
+          const newText = this.responseText.substring(lastIndex)
+          lastIndex = this.responseText.length
 
-        buffer += newText
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
+          buffer += newText
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const data = JSON.parse(line.slice(6).trim())
-            if (data.content) {
-              assistantContent += data.content
-              if (!assistantMessage) {
-                assistantMessage = {
-                  id: (Date.now() + 1).toString(),
-                  role: 'assistant',
-                  content: '',
-                  sourceType: data.source_type || 'llm',
-                  sources: data.sources || [],
-                  createdAt: new Date().toISOString(),
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            try {
+              const data = JSON.parse(line.slice(6).trim())
+              if (data.content) {
+                assistantContent += data.content
+                if (!assistantMessage) {
+                  assistantMessage = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: '',
+                    sourceType: data.source_type || 'llm',
+                    sources: data.sources || [],
+                    createdAt: new Date().toISOString(),
+                  }
+                  messages.value.push(assistantMessage)
                 }
-                messages.value.push(assistantMessage)
+                assistantMessage.content = assistantContent
+                assistantMessage.sourceType = data.source_type || 'llm'
               }
-              assistantMessage.content = assistantContent
-              assistantMessage.sourceType = data.source_type || 'llm'
-            }
-            if (data.error) {
-              error.value = data.error
-              if (!assistantMessage) {
-                assistantMessage = {
-                  id: (Date.now() + 1).toString(),
-                  role: 'assistant',
-                  content: '',
-                  sourceType: 'error',
-                  createdAt: new Date().toISOString(),
+              if (data.error) {
+                error.value = data.error
+                if (!assistantMessage) {
+                  assistantMessage = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: '',
+                    sourceType: 'error',
+                    createdAt: new Date().toISOString(),
+                  }
+                  messages.value.push(assistantMessage)
                 }
-                messages.value.push(assistantMessage)
+                assistantMessage.content = assistantContent + `\n\n⚠️ 错误: ${data.error}`
               }
-              assistantMessage.content = assistantContent + `\n\n⚠️ 错误: ${data.error}`
+            } catch (_) {
+              // 忽略无法解析的 SSE 行
             }
-          } catch (_) {
-            // 忽略无法解析的 SSE 行
           }
         }
-      }
+      )
 
-      // 等待请求完成
-      if (xhr.readyState !== 4) {
-        await new Promise((resolve) => {
-          xhr.addEventListener('loadend', resolve, { once: true })
-        })
+      if (xhr.status < 200 || xhr.status >= 300) {
+        throw new Error(`HTTP ${xhr.status}: ${xhr.statusText}`)
       }
 
       // 处理残留 buffer
