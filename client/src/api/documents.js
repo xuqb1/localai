@@ -41,4 +41,8 @@ export const documentsApi = {
   getImportTask(taskId) {
     return axios.get(`/documents/import-task/${taskId}`)
   },
+
+  retryImport(id) {
+    return axios.post(`/documents/${id}/retry-import`)
+  },
 }

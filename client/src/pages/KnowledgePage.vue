@@ -1,6 +1,6 @@
 <script setup>import { useDocumentStore } from '../stores/documentStore';
 import { documentsApi } from '../api';
-import { Search, Plus, Edit, Trash2, FolderOpen, Eye, Loader2, X, Save, FileText, RefreshCw, Upload } from '@lucide/vue';
+import { Search, Plus, Edit, Trash2, FolderOpen, Eye, Loader2, X, Save, FileText, RefreshCw, Upload, RotateCcw } from '@lucide/vue';
 import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
 import ConfirmDialog from '../components/common/ConfirmDialog.vue';
 import MessageModel from '../components/common/MessageModel.vue';
@@ -132,6 +132,21 @@ async function handleImportFile() {
  isImporting.value = false;
  }
 }
+async function handleRetryImport(doc) {
+  if (isImporting.value) return
+  isImporting.value = true
+  try {
+    const result = await documentsApi.retryImport(doc.id)
+    showToast('success', result.message || '重新导入任务已提交，将从中断处继续')
+    if (result.taskId) {
+      await pollTaskStatus(result.taskId)
+    }
+  } catch (e) {
+    showToast('error', '重新导入失败：' + (e.response?.data?.error || e.message))
+  } finally {
+    isImporting.value = false
+  }
+}
 async function pollTaskStatus(taskId) {
  // 清理之前的轮询
  if (activePollInterval) {
@@ -208,6 +223,12 @@ async function handleSaveEdit() {
  catch (e) {
  showToast('error', '更新失败：' + e.message);
  }
+}
+function statusText(status) {
+  if (status === 'importing') return '导入中'
+  if (status === 'completed') return '已导入'
+  if (status === 'interrupted') return '已中断'
+  return '未知'
 }
 function formatNumber(num) {
   if (!num && num !== 0) return '-'
@@ -317,10 +338,11 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
                   'px-2 py-1 rounded text-xs font-medium',
                   doc.import_status === 'importing' ? 'bg-yellow-500/20 text-yellow-400' : '',
                   doc.import_status === 'completed' ? 'bg-green-500/20 text-green-400' : '',
-                  (!doc.import_status || doc.import_status === 'unknown') ? 'bg-red-500/20 text-red-400' : ''
+                  doc.import_status === 'interrupted' ? 'bg-orange-500/20 text-orange-400' : '',
+                  (!doc.import_status) ? 'bg-slate-500/20 text-slate-400' : ''
                 ]"
               >
-                {{ doc.import_status === 'importing' ? '导入中' : (doc.import_status === 'completed' ? '已导入' : '未知') }}
+                {{ statusText(doc.import_status) }}
               </span>
             </td>
             <td class="px-6 py-4">
@@ -333,6 +355,10 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
                   ></div>
                 </div>
               </div>
+              <div v-else-if="doc.import_status === 'interrupted'" class="flex flex-col gap-1">
+                <span class="text-orange-400 text-sm">{{ formatNumber(doc.chunk_count) }} / {{ formatNumber(doc.total_lines) }} ({{ formatPercent(doc.chunk_count, doc.total_lines) }})</span>
+                <span class="text-slate-500 text-xs">导入中断，可点击重新导入继续</span>
+              </div>
               <span v-else class="text-slate-400 text-sm">
                 {{ formatNumber(doc.chunk_count) }} 行
               </span>
@@ -340,6 +366,16 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
             <td class="px-6 py-4 text-slate-400 text-sm">{{ formatDate(doc.created_at) }}</td>
             <td class="px-6 py-4">
               <div class="flex items-center gap-2">
+                <button 
+                  v-if="doc.import_status === 'interrupted'"
+                  @click="handleRetryImport(doc)"
+                  :disabled="isImporting"
+                  class="p-2 text-orange-400 hover:bg-orange-400/10 rounded-lg transition-colors"
+                  title="重新导入（将从中断处继续）"
+                >
+                  <RotateCcw :size="16" v-if="!isImporting" />
+                  <Loader2 :size="16" class="animate-spin" v-else />
+                </button>
                 <button 
                   @click="handleView(doc)"
                   class="p-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"

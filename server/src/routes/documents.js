@@ -293,6 +293,62 @@ router.get('/documents/:id/vector-graph', async (req, res) => {
   }
 })
 
+// 重新导入中断的文档（从已有 file_path 继续）
+router.post('/documents/:id/retry-import', async (req, res) => {
+  try {
+    const { id } = req.params
+    const doc = documentRepository.findById(id)
+    if (!doc) {
+      return res.status(404).json({ error: '文档不存在' })
+    }
+    if (!doc.file_path) {
+      return res.status(400).json({ error: '文档无关联文件路径，无法重新导入' })
+    }
+    if (!fs.existsSync(doc.file_path)) {
+      return res.status(400).json({ error: `文件不存在: ${doc.file_path}` })
+    }
+
+    const ext = path.extname(doc.file_path).toLowerCase()
+
+    const task = taskManager.createTask('retry_import', {
+      documentId: id,
+      filePath: doc.file_path,
+      fileType: ext,
+    })
+
+    taskManager.executeTask(task.id, async (taskId, updateProgress) => {
+      updateProgress(0, `开始重新导入: ${doc.title}`)
+
+      let result
+      if (ext === '.csv') {
+        result = await ragService.addCsvDocumentByLines(doc.file_path, (progress, msg) => {
+          updateProgress(progress, msg)
+        })
+      } else {
+        result = await ragService.addDocument(doc.file_path)
+      }
+
+      taskManager.updateTask(taskId, {
+        status: 'completed',
+        progress: 100,
+        message: ext === '.csv'
+          ? `重新导入完成，共 ${result.chunkCount} 行`
+          : `重新导入完成`,
+        result,
+      })
+    })
+
+    res.json({
+      success: true,
+      taskId: task.id,
+      message: '重新导入任务已提交，将从中断处继续',
+    })
+  } catch (e) {
+    console.error('重新导入错误:', e)
+    res.status(500).json({ error: e.message || '重新导入失败' })
+  }
+})
+
 router.get('/vector-stats', async (req, res) => {
   try {
     const stats = await vectorDb.getStats()

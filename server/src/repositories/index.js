@@ -6,8 +6,8 @@ export class DocumentRepository {
     const id = generateUUID()
     const now = formatDate(new Date())
     db.prepare(`
-      INSERT INTO documents (id, title, file_path, file_type, content, chunk_count, metadata, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO documents (id, title, file_path, file_type, content, chunk_count, metadata, import_status, import_progress, total_lines, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run([
       id,
       doc.title,
@@ -16,10 +16,13 @@ export class DocumentRepository {
       doc.content || null,
       doc.chunkCount || 0,
       doc.metadata ? JSON.stringify(doc.metadata) : null,
+      'completed',
+      100,
+      0,
       now,
       now,
     ])
-    return { id, ...doc, createdAt: now, updatedAt: now }
+    return { id, ...doc, createdAt: now, updatedAt: now, importStatus: 'completed', importProgress: 100, totalLines: 0 }
   }
 
   findAll(params) {

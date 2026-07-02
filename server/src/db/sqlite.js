@@ -75,6 +75,15 @@ try {
   db.exec('ALTER TABLE documents ADD COLUMN total_lines INTEGER DEFAULT 0')
 } catch (e) {}
 
+// 修复历史数据：NULL 的 import_status 改为 'completed'（旧文档在迁移前已存在）
+db.prepare("UPDATE documents SET import_status = 'completed' WHERE import_status IS NULL").run()
+
+// 服务重启后，所有 'importing' 状态的文档标记为 'interrupted'（TaskManager 是纯内存的，重启后任务已丢失）
+const interruptedCount = db.prepare("UPDATE documents SET import_status = 'interrupted' WHERE import_status = 'importing'").run()
+if (interruptedCount.changes > 0) {
+  console.log(`[DB] 检测到 ${interruptedCount.changes} 个导入中断的文档，已标记为 interrupted`)
+}
+
 try {
   db.exec('ALTER TABLE settings ADD COLUMN agnes_api_url TEXT DEFAULT "https://api.agnes.cn"')
 } catch (e) {}
