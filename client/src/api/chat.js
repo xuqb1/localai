@@ -10,8 +10,8 @@ export const chatApi = {
   },
 
   sendMessage(data, signal) {
-    // 直连后端 3001 端口，用标准 fetch + ReadableStream 流式消费
-    return fetch('http://localhost:3001/api/chat', {
+    // 走 Vite 代理，同源无 CORS 问题
+    return fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
