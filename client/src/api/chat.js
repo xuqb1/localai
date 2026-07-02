@@ -10,13 +10,25 @@ export const chatApi = {
   },
 
   sendMessage(data, signal) {
-    return fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-      signal, // 支持 AbortController 取消请求
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/chat')
+      xhr.setRequestHeader('Content-Type', 'application/json')
+
+      // 支持 AbortController 取消
+      if (signal) {
+        signal.addEventListener('abort', () => xhr.abort())
+      }
+
+      xhr.onload = () => resolve(xhr)
+      xhr.onerror = () => reject(new Error('网络请求失败'))
+      xhr.onabort = () => {
+        const err = new Error('已取消')
+        err.name = 'AbortError'
+        reject(err)
+      }
+
+      xhr.send(JSON.stringify(data))
     })
   },
 
