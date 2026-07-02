@@ -79,73 +79,76 @@ export const useChatStore = defineStore('chat', () => {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      // 用 async 迭代器读取 ReadableStream——现代浏览器原生支持
-      const decoder = new TextDecoder('utf-8', { stream: true })
       let buffer = ''
       let assistantContent = ''
       let assistantMessage = null
 
-      for await (const chunk of response.body) {
-        const text = decoder.decode(chunk, { stream: true })
-        buffer += text
-
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const data = JSON.parse(line.slice(6).trim())
-            if (data.content) {
-              assistantContent += data.content
-              if (!assistantMessage) {
-                assistantMessage = {
-                  id: (Date.now() + 1).toString(),
-                  role: 'assistant',
-                  content: '',
-                  sourceType: data.source_type || 'llm',
-                  sources: data.sources || [],
-                  createdAt: new Date().toISOString(),
-                }
-                messages.value.push(assistantMessage)
+      function processLine(line) {
+        if (!line || !line.startsWith('data: ')) return
+        try {
+          const data = JSON.parse(line.slice(6).trim())
+          if (data.content) {
+            assistantContent += data.content
+            if (!assistantMessage) {
+              assistantMessage = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: '',
+                sourceType: data.source_type || 'llm',
+                sources: data.sources || [],
+                createdAt: new Date().toISOString(),
               }
-              assistantMessage.content = assistantContent
-              assistantMessage.sourceType = data.source_type || 'llm'
+              messages.value.push(assistantMessage)
             }
-            if (data.error) {
-              error.value = data.error
-              if (!assistantMessage) {
-                assistantMessage = {
-                  id: (Date.now() + 1).toString(),
-                  role: 'assistant',
-                  content: '',
-                  sourceType: 'error',
-                  createdAt: new Date().toISOString(),
-                }
-                messages.value.push(assistantMessage)
-              }
-              assistantMessage.content = assistantContent + `\n\n⚠️ 错误: ${data.error}`
-            }
-          } catch (_) {
-            // 忽略无法解析的 SSE 行
+            assistantMessage.content = assistantContent
+            assistantMessage.sourceType = data.source_type || 'llm'
           }
+          if (data.error) {
+            error.value = data.error
+            if (!assistantMessage) {
+              assistantMessage = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: '',
+                sourceType: 'error',
+                createdAt: new Date().toISOString(),
+              }
+              messages.value.push(assistantMessage)
+            }
+            assistantMessage.content = assistantContent + `\n\n⚠️ 错误: ${data.error}`
+          }
+        } catch (_) {
+          /* ignore unparseable line */
         }
       }
 
-      // 处理残留 buffer
-      if (buffer.trim().startsWith('data: ')) {
-        try {
-          const data = JSON.parse(buffer.trim().slice(6).trim())
-          if (data.content) {
-            assistantContent += data.content
-            if (assistantMessage) assistantMessage.content = assistantContent
-          }
-        } catch (_) { /* ignore */ }
+      // 用 WritableStream 消费 SSE 数据——不依赖 ReadableStream 的 async 迭代
+      const body = response.body
+      if (!body) {
+        throw new Error('浏览器不支持流式读取')
       }
+
+      await body
+        .pipeThrough(new TextDecoderStream('utf-8'))
+        .pipeTo(new WritableStream({
+          write(text) {
+            buffer += text
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || ''
+            for (const line of lines) {
+              processLine(line.trim())
+            }
+          },
+        }))
+
+      // 处理残留 buffer
+      const residual = buffer.trim()
+      if (residual) processLine(residual)
 
       if (assistantMessage) {
         assistantMessage.sourceType = assistantMessage.sourceType || 'llm'
       } else {
+        console.warn('[SSE] 未解析到任何内容, 原始响应:', buffer || '(empty)')
         messages.value.push({
           id: (Date.now() + 1).toString(),
           role: 'assistant',
