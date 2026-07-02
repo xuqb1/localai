@@ -70,8 +70,6 @@ export const useChatStore = defineStore('chat', () => {
     abortController = new AbortController()
 
     try {
-      let buffer = ''
-      let lastIndex = 0
       let assistantContent = ''
       let assistantMessage = null
 
@@ -114,7 +112,7 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      // 用 fetch + ReadableStream.getReader 流式消费 SSE
+      // 【诊断模式】用 response.text() 获取完整响应，确认数据是否完整到达
       const response = await chatApi.sendMessage({
         message,
         conversationId: currentConversationId.value,
@@ -124,45 +122,14 @@ export const useChatStore = defineStore('chat', () => {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const body = response.body
-      if (!body) throw new Error('浏览器不支持流式读取')
+      const fullText = await response.text()
+      console.log('[诊断] 完整响应到达:', fullText.length, 'bytes')
 
-      const reader = body.getReader()
-      const decoder = new TextDecoder()
-      let chunkCount = 0
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          chunkCount++
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            processLine(line.trim())
-          }
-        }
-
-        // flush decoder 中残留的字节
-        const flush = decoder.decode()
-        if (flush) {
-          buffer += flush
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          for (const line of lines) {
-            processLine(line.trim())
-          }
-        }
-      } finally {
-        reader.releaseLock()
+      // 解析完整的 SSE 文本
+      const lines = fullText.split('\n')
+      for (const line of lines) {
+        processLine(line.trim())
       }
-
-      // 处理残留 buffer
-      const residual = buffer.trim()
-      if (residual) processLine(residual)
 
       if (assistantMessage) {
         assistantMessage.sourceType = assistantMessage.sourceType || 'llm'
