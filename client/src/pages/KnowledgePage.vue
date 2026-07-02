@@ -1,9 +1,9 @@
 <script setup>import { useDocumentStore } from '../stores/documentStore';
 import { documentsApi } from '../api';
 import { Search, Plus, Edit, Trash2, FolderOpen, Eye, Loader2, X, Save, FileText, RefreshCw, Upload } from '@lucide/vue';
-import { onMounted, ref, computed, nextTick } from 'vue';
-import ConfirmDialog from 'E:/codeseq/vue3_components/ConfirmDialog.vue';
-import MessageModel from 'E:/codeseq/vue3_components/MessageModel.vue';
+import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
+import ConfirmDialog from '../components/common/ConfirmDialog.vue';
+import MessageModel from '../components/common/MessageModel.vue';
 const documentStore = useDocumentStore();
 const searchQuery = ref('');
 const showImportModal = ref(false);
@@ -25,10 +25,23 @@ const showImportFileModal = ref(false);
 const importFolderPath = ref('');
 const importFileName = ref('');
 let autoRefreshTimer = null
+let activePollInterval = null
 onMounted(() => {
  documentStore.fetchDocuments().then(() => {
   startAutoRefreshIfNeeded()
  });
+});
+
+onUnmounted(() => {
+  // 清理所有定时器，防止内存泄漏
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+  }
+  if (activePollInterval) {
+    clearInterval(activePollInterval)
+    activePollInterval = null
+  }
 });
 function startAutoRefreshIfNeeded() {
  const hasImporting = documentStore.documents.some(d => d.import_status === 'importing')
@@ -120,32 +133,51 @@ async function handleImportFile() {
  }
 }
 async function pollTaskStatus(taskId) {
- let pollInterval = setInterval(async () => {
- try {
- const task = await documentsApi.getImportTask(taskId);
- if (!task || task.error === '任务不存在') {
- clearInterval(pollInterval);
- console.log('任务不存在，停止轮询');
- return;
+ // 清理之前的轮询
+ if (activePollInterval) {
+   clearInterval(activePollInterval)
+   activePollInterval = null
  }
- if (task.status === 'completed') {
- clearInterval(pollInterval);
- showToast('success', task.message || '导入完成');
- await documentStore.fetchDocuments();
- } else if (task.status === 'failed') {
- clearInterval(pollInterval);
- showToast('error', task.message || '导入失败');
- } else if (task.status === 'running') {
- console.log(`导入进度: ${task.progress}% - ${task.message}`);
- await documentStore.fetchDocuments();
- }
- } catch (e) {
- if (e.response && e.response.status === 404) {
- clearInterval(pollInterval);
- return;
- }
- console.error('查询任务状态失败:', e);
- }
+ let pollCount = 0
+ const maxPolls = 300 // 最多轮询 300 次（15 分钟）
+
+ activePollInterval = setInterval(async () => {
+   pollCount++
+   if (pollCount > maxPolls) {
+     clearInterval(activePollInterval)
+     activePollInterval = null
+     showToast('warning', '导入任务超时，请手动刷新查看状态')
+     return
+   }
+   try {
+     const task = await documentsApi.getImportTask(taskId);
+     if (!task || task.error === '任务不存在') {
+       clearInterval(activePollInterval)
+       activePollInterval = null
+       console.log('任务不存在，停止轮询');
+       return;
+     }
+     if (task.status === 'completed') {
+       clearInterval(activePollInterval)
+       activePollInterval = null
+       showToast('success', task.message || '导入完成');
+       await documentStore.fetchDocuments();
+     } else if (task.status === 'failed') {
+       clearInterval(activePollInterval)
+       activePollInterval = null
+       showToast('error', task.message || '导入失败');
+     } else if (task.status === 'running') {
+       console.log(`导入进度: ${task.progress}% - ${task.message}`);
+       await documentStore.fetchDocuments();
+     }
+   } catch (e) {
+     if (e.response && e.response.status === 404) {
+       clearInterval(activePollInterval)
+       activePollInterval = null
+       return;
+     }
+     console.error('查询任务状态失败:', e);
+   }
  }, 3000);
 }
 async function handleView(doc) {
@@ -333,7 +365,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
             </td>
           </tr>
           <tr v-if="documentStore.documents.length === 0">
-            <td colspan="6" class="px-6 py-12 text-center text-slate-500">
+            <td colspan="7" class="px-6 py-12 text-center text-slate-500">
               暂无文档，请导入或创建文档
             </td>
           </tr>

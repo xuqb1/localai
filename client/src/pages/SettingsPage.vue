@@ -2,7 +2,7 @@
 import { useSettingsStore } from '../stores/settingsStore'
 import { onMounted, ref, computed } from 'vue'
 import { Eye, EyeOff, Save, RefreshCw, Plus, Trash2, Edit2 } from '@lucide/vue'
-import MessageModel from 'E:/codeseq/vue3_components/MessageModel.vue'
+import MessageModel from '../components/common/MessageModel.vue'
 
 const settingsStore = useSettingsStore()
 const showAgnesKey = ref(false)

@@ -8,6 +8,7 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref([])
   const isLoading = ref(false)
   const error = ref(null)
+  let abortController = null // 用于取消正在进行的 SSE 请求
 
   const currentConversation = computed(() => {
     return conversations.value.find(c => c.id === currentConversationId.value) || null
@@ -50,6 +51,11 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function sendMessage(message) {
+    // 取消之前的请求
+    if (abortController) {
+      abortController.abort()
+    }
+
     isLoading.value = true
     error.value = null
 
@@ -61,78 +67,88 @@ export const useChatStore = defineStore('chat', () => {
     }
     messages.value.push(userMessage)
 
+    abortController = new AbortController()
+
     try {
       const response = await chatApi.sendMessage({
         message,
         conversationId: currentConversationId.value,
-      })
+      }, abortController.signal)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder('utf-8', { stream: true })
       let assistantContent = ''
       let assistantMessage = null
-      let sourceType = 'llm'
       let buffer = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
-          if (buffer) {
-            processBuffer(buffer)
-          }
+          // 处理残留的 buffer
+          processLine(buffer.trim())
           break
         }
 
-        const text = decoder.decode(value, { stream: !done })
+        const text = decoder.decode(value, { stream: true })
         buffer += text
-        
-        if (buffer.includes('\n')) {
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          for (const line of lines) {
-            processLine(line)
-          }
+
+        // 按行分割处理 SSE 数据
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // 保留最后不完整的行
+        for (const line of lines) {
+          processLine(line.trim())
         }
       }
 
       function processLine(line) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6))
-            if (data.content) {
-              assistantContent += data.content
-              if (!assistantMessage) {
-                assistantMessage = {
-                  id: (Date.now() + 1).toString(),
-                  role: 'assistant',
-                  content: '',
-                  sourceType: data.source_type || 'llm',
-                  sources: data.sources || [],
-                  createdAt: new Date().toISOString(),
-                }
-                messages.value.push(assistantMessage)
+        if (!line || !line.startsWith('data: ')) return
+        try {
+          const data = JSON.parse(line.slice(6))
+          if (data.content) {
+            assistantContent += data.content
+            if (!assistantMessage) {
+              assistantMessage = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: '',
+                sourceType: data.source_type || 'llm',
+                sources: data.sources || [],
+                createdAt: new Date().toISOString(),
               }
-              assistantMessage.content = assistantContent
-              sourceType = data.source_type || 'llm'
+              messages.value.push(assistantMessage)
             }
-          } catch (e) {
-            console.error('解析流式响应失败:', e)
+            assistantMessage.content = assistantContent
+            assistantMessage.sourceType = data.source_type || 'llm'
           }
-        }
-      }
-
-      function processBuffer(buf) {
-        const lines = buf.split('\n')
-        for (const line of lines) {
-          processLine(line)
+          if (data.error) {
+            error.value = data.error
+          }
+        } catch (e) {
+          // 忽略无法解析的 SSE 行
         }
       }
 
       if (assistantMessage) {
-        assistantMessage.sourceType = sourceType
+        assistantMessage.sourceType = assistantMessage.sourceType || 'llm'
+      } else {
+        // 没有收到助手回复，添加错误消息
+        messages.value.push({
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: '未收到有效回复，请重试。',
+          createdAt: new Date().toISOString(),
+        })
       }
 
     } catch (e) {
+      if (e.name === 'AbortError') {
+        // 请求被取消，不需要显示错误
+        return
+      }
       error.value = e.message
       messages.value.push({
         id: (Date.now() + 1).toString(),
@@ -142,6 +158,7 @@ export const useChatStore = defineStore('chat', () => {
       })
     } finally {
       isLoading.value = false
+      abortController = null
     }
   }
 
@@ -151,8 +168,8 @@ export const useChatStore = defineStore('chat', () => {
       conversations.value = conversations.value.filter(c => c.id !== id)
       if (currentConversationId.value === id) {
         if (conversations.value.length > 0) {
-          const latestConversation = conversations.value[conversations.value.length - 1]
-          await selectConversation(latestConversation.id)
+          // 选择第一个（最新的）对话
+          await selectConversation(conversations.value[0].id)
         } else {
           currentConversationId.value = null
           messages.value = []

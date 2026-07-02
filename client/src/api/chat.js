@@ -9,13 +9,14 @@ export const chatApi = {
     return axios.get(`/chat/history/${id}`)
   },
 
-  sendMessage(data) {
+  sendMessage(data, signal) {
     return fetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
+      signal, // 支持 AbortController 取消请求
     })
   },
 

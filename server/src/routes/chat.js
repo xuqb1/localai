@@ -14,6 +14,14 @@ router.post('/chat', async (req, res) => {
   try {
     const { message, conversationId, model } = req.body
     console.log('收到聊天请求:', { message, conversationId, model })
+
+    // 输入验证
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      return res.status(400).json({ error: '消息内容不能为空' })
+    }
+    if (message.length > 10000) {
+      return res.status(400).json({ error: '消息内容过长，最多10000字符' })
+    }
     
     const settings = settingsRepository.get()
     const targetModel = model || settings.defaultModel
@@ -39,7 +47,13 @@ router.post('/chat', async (req, res) => {
 
     if (knowledgeResult.hasKnowledge) {
       sourceType = 'local'
-      sources = knowledgeResult.sources
+      // 按文档 id 去重
+      const seenIds = new Set()
+      sources = knowledgeResult.sources.filter(s => {
+        if (seenIds.has(s.id)) return false
+        seenIds.add(s.id)
+        return true
+      })
       prompt = `请根据以下参考信息回答用户的问题。如果参考信息中有相关内容，请基于这些内容进行回答；如果没有相关内容，请直接回答问题。
 
 参考信息：
@@ -49,6 +63,19 @@ ${knowledgeResult.context}
 
 请用自然、友好的语言回答，不要提及"根据参考信息"等字眼。`
     }
+
+    // 客户端断开连接时，尝试保存已获取的内容
+    let fullContent = ''
+    const handleClientClose = () => {
+      if (fullContent) {
+        try {
+          messageRepository.create(conversationId, 'assistant', fullContent, sourceType)
+        } catch (e) {
+          console.error('保存中断的消息失败:', e)
+        }
+      }
+    }
+    res.on('close', handleClientClose)
 
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
     res.setHeader('Cache-Control', 'no-cache')
@@ -62,12 +89,16 @@ ${knowledgeResult.context}
       settings,
     })
 
-    let fullContent = ''
-    const decoder = new TextDecoder('utf-8')
+    const decoder = new TextDecoder('utf-8', { stream: true })
+    let buffer = ''
 
     for await (const chunk of llmResponse.data) {
-      const text = decoder.decode(chunk)
-      const lines = text.split('\n')
+      const text = decoder.decode(chunk, { stream: true })
+      buffer += text
+
+      // 按行分割，保留不完整的行在 buffer 中
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
 
       for (const line of lines) {
         if (line.startsWith('data: ')) {
@@ -89,6 +120,30 @@ ${knowledgeResult.context}
             }
           } catch (e) {
             console.error('解析流式响应失败:', e)
+          }
+        }
+      }
+    }
+
+    // 处理 buffer 中剩余的数据
+    if (buffer.trim()) {
+      const line = buffer.trim()
+      if (line.startsWith('data: ')) {
+        const dataStr = line.slice(6).trim()
+        if (dataStr !== '[DONE]') {
+          try {
+            const data = JSON.parse(dataStr)
+            if (data.choices && data.choices[0] && data.choices[0].delta) {
+              const content = data.choices[0].delta.content || ''
+              fullContent += content
+              res.write(`data: ${JSON.stringify({
+                content,
+                source_type: sourceType,
+                sources,
+              })}\n\n`)
+            }
+          } catch (e) {
+            console.error('解析最终流式响应失败:', e)
           }
         }
       }

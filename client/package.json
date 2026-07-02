@@ -13,6 +13,7 @@
     "@tailwindcss/typography": "^0.5.20",
     "autoprefixer": "^10.5.2",
     "axios": "^1.18.1",
+    "dompurify": "^3.4.11",
     "lucide-vue-next": "^1.0.0",
     "marked": "^18.0.5",
     "pinia": "^3.0.4",

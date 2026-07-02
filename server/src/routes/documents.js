@@ -74,20 +74,40 @@ router.delete('/documents/:id', async (req, res) => {
 
 function getAllFiles(dir, supportedExts) {
   const results = []
-  const files = fs.readdirSync(dir)
+  const visited = new Set() // 防止符号链接循环
+  const maxFiles = 10000 // 最大文件数限制
 
-  for (const file of files) {
-    const filePath = path.join(dir, file)
-    const stat = fs.statSync(filePath)
+  if (!fs.existsSync(dir)) return results
 
-    if (stat.isDirectory()) {
-      results.push(...getAllFiles(filePath, supportedExts))
-    } else {
-      const ext = path.extname(file).toLowerCase()
-      if (supportedExts.includes(ext)) {
-        results.push(filePath)
+  try {
+    const realPath = fs.realpathSync(dir)
+    if (visited.has(realPath)) return results
+    visited.add(realPath)
+
+    const files = fs.readdirSync(dir)
+
+    for (const file of files) {
+      if (results.length >= maxFiles) break
+
+      const filePath = path.join(dir, file)
+      let stat
+      try {
+        stat = fs.statSync(filePath)
+      } catch {
+        continue // 跳过无法访问的文件
+      }
+
+      if (stat.isDirectory()) {
+        results.push(...getAllFiles(filePath, supportedExts))
+      } else {
+        const ext = path.extname(file).toLowerCase()
+        if (supportedExts.includes(ext)) {
+          results.push(filePath)
+        }
       }
     }
+  } catch {
+    // 目录无法读取，跳过
   }
 
   return results
@@ -117,7 +137,13 @@ router.post('/documents/import-file', async (req, res) => {
       return res.status(400).json({ error: '文件夹路径和文件名不能为空' })
     }
 
-    const filePath = path.join(folderPath, fileName)
+    // 路径遍历防护：验证拼接后的路径仍在 folderPath 下
+    const resolvedBase = path.resolve(folderPath)
+    const filePath = path.resolve(path.join(folderPath, fileName))
+    if (!filePath.startsWith(resolvedBase + path.sep) && filePath !== resolvedBase) {
+      return res.status(403).json({ error: '非法的文件路径访问' })
+    }
+
     const ext = path.extname(fileName).toLowerCase()
 
     const task = taskManager.createTask('import_file', {

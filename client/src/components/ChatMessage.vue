@@ -1,7 +1,8 @@
 <script setup>
 import { Copy, Check, User, Bot } from '@lucide/vue'
-import { ref, defineProps, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 const props = defineProps({
   message: {
@@ -16,7 +17,8 @@ const renderedContent = computed(() => {
   if (props.message.role === 'user') {
     return props.message.content
   }
-  return marked(props.message.content || '')
+  const rawHtml = marked.parse(props.message.content || '', { breaks: true, gfm: true })
+  return DOMPurify.sanitize(rawHtml, { ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr', 'img'], ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'] })
 })
 
 const formattedTime = computed(() => {
@@ -30,11 +32,15 @@ const formattedTime = computed(() => {
 })
 
 function copyContent() {
-  navigator.clipboard.writeText(props.message.content)
-  isCopied.value = true
-  setTimeout(() => {
-    isCopied.value = false
-  }, 2000)
+  try {
+    navigator.clipboard.writeText(props.message.content)
+    isCopied.value = true
+    setTimeout(() => {
+      isCopied.value = false
+    }, 2000)
+  } catch {
+    // clipboard API not available
+  }
 }
 </script>
 

@@ -2,11 +2,10 @@
 import { useChatStore } from '../stores/chatStore'
 import ChatMessage from '../components/ChatMessage.vue'
 import ChatInput from '../components/ChatInput.vue'
-import { Plus, Trash2, Pencil } from '@lucide/vue'
-import { onMounted, ref, nextTick, watch } from 'vue'
-import { Copy, Check, User, Bot } from '@lucide/vue'
-import ModalDialog from 'E:/codeseq/vue3_components/ModalDialog.vue'
-import MessageModel from 'E:/codeseq/vue3_components/MessageModel.vue'
+import { Plus, Trash2, Pencil, User, Bot } from '@lucide/vue'
+import { onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
+import ModalDialog from '../components/common/ModalDialog.vue'
+import MessageModel from '../components/common/MessageModel.vue'
 
 const chatStore = useChatStore()
 const messagesContainer = ref(null)
@@ -52,6 +51,13 @@ onMounted(async () => {
   if (chatStore.conversations.length > 0) {
     await chatStore.selectConversation(chatStore.conversations[0].id)
   }
+})
+
+onUnmounted(() => {
+  // 清理拖拽事件监听器，防止内存泄漏
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+  document.body.style.cursor = ''
 })
 
 watch(() => chatStore.messages.length, async () => {
