@@ -9,20 +9,28 @@ export class RAGService {
     this.documentRepository = new DocumentRepository()
   }
 
-  async retrieveKnowledge(query, topK = 5) {
+  async retrieveKnowledge(query, topK = 5, minScore = 0.5) {
     const results = await vectorDb.similaritySearch(query, topK)
     
     if (results.length === 0) {
       return { hasKnowledge: false, sources: [], context: '' }
     }
 
-    const sources = results.map(result => ({
+    // 按相似度阈值过滤，只有真正相关的内容才算命中
+    const relevant = results.filter(r => r.score >= minScore)
+    console.log(`[RAG] 搜索 "${query}": 候选 ${results.length} 条, 阈值>=${minScore} 命中 ${relevant.length} 条`)
+
+    if (relevant.length === 0) {
+      return { hasKnowledge: false, sources: [], context: '' }
+    }
+
+    const sources = relevant.map(result => ({
       id: result.metadata.document_id,
       title: result.metadata.title,
       score: result.score,
     }))
 
-    const context = results.map(result => result.content).join('\n\n---\n\n')
+    const context = relevant.map(result => result.content).join('\n\n---\n\n')
 
     return {
       hasKnowledge: true,

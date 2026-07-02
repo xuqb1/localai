@@ -44,7 +44,7 @@ router.post('/chat', async (req, res) => {
 
     messageRepository.create(conversationId, 'user', message)
 
-    const knowledgeResult = await ragService.retrieveKnowledge(message)
+    const knowledgeResult = await ragService.retrieveKnowledge(message, 5, 0.5)
     console.log('知识库检索结果:', { hasKnowledge: knowledgeResult.hasKnowledge, sourcesCount: knowledgeResult.sources.length })
     
     let sourceType = 'llm'
