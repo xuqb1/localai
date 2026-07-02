@@ -31,15 +31,33 @@ const formattedTime = computed(() => {
   }
 })
 
-function copyContent() {
+async function copyContent() {
+  const text = props.message.content || ''
+  if (!text) return
+
   try {
-    navigator.clipboard.writeText(props.message.content)
+    await navigator.clipboard.writeText(text)
     isCopied.value = true
-    setTimeout(() => {
-      isCopied.value = false
-    }, 2000)
+    setTimeout(() => { isCopied.value = false }, 2000)
+    return
+  } catch (e) {
+    console.warn('Clipboard API 失败，尝试 fallback:', e)
+  }
+
+  // Fallback: 使用 execCommand（兼容 HTTP/非安全上下文）
+  try {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    isCopied.value = true
+    setTimeout(() => { isCopied.value = false }, 2000)
   } catch {
-    // clipboard API not available
+    // 都失败了
   }
 }
 </script>
