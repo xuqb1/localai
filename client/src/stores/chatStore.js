@@ -114,18 +114,30 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      // XHR onprogress：每次收到数据时增量解析 SSE
-      const xhr = await chatApi.sendMessage(
-        {
-          message,
-          conversationId: currentConversationId.value,
-        },
-        abortController.signal,
-        function () {
-          const newText = this.responseText.substring(lastIndex)
-          lastIndex = this.responseText.length
+      // 用 fetch + ReadableStream.getReader 流式消费 SSE
+      const response = await chatApi.sendMessage({
+        message,
+        conversationId: currentConversationId.value,
+      }, abortController.signal)
 
-          buffer += newText
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const body = response.body
+      if (!body) throw new Error('浏览器不支持流式读取')
+
+      const reader = body.getReader()
+      const decoder = new TextDecoder()
+      let chunkCount = 0
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          chunkCount++
+
+          buffer += decoder.decode(value, { stream: true })
           const lines = buffer.split('\n')
           buffer = lines.pop() || ''
 
@@ -133,7 +145,20 @@ export const useChatStore = defineStore('chat', () => {
             processLine(line.trim())
           }
         }
-      )
+
+        // flush decoder 中残留的字节
+        const flush = decoder.decode()
+        if (flush) {
+          buffer += flush
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            processLine(line.trim())
+          }
+        }
+      } finally {
+        reader.releaseLock()
+      }
 
       // 处理残留 buffer
       const residual = buffer.trim()

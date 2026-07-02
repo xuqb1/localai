@@ -90,6 +90,13 @@ ${knowledgeResult.context}
     res.setHeader('Cache-Control', 'no-cache')
     res.setHeader('Connection', 'keep-alive')
     res.setHeader('X-Accel-Buffering', 'no')  // 禁用 nginx 缓冲
+    res.flushHeaders()  // 立即发送响应头，确保浏览器开始接收
+
+    // 禁用 Nagle 算法，防止 TCP 层缓冲小数据块
+    if (res.socket) {
+      res.socket.setNoDelay(true)
+    }
+
     // 增加 TCP 心跳，用 comment 行保持连接
     const keepAliveInterval = setInterval(() => {
       if (res.writable) {
