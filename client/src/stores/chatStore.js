@@ -70,78 +70,31 @@ export const useChatStore = defineStore('chat', () => {
     abortController = new AbortController()
 
     try {
-      let assistantContent = ''
-      let assistantMessage = null
-
-      function processLine(line) {
-        if (!line || !line.startsWith('data: ')) return
-        try {
-          const data = JSON.parse(line.slice(6).trim())
-          if (data.content) {
-            assistantContent += data.content
-            if (!assistantMessage) {
-              assistantMessage = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: '',
-                sourceType: data.source_type || 'llm',
-                sources: data.sources || [],
-                createdAt: new Date().toISOString(),
-              }
-              messages.value.push(assistantMessage)
-            }
-            assistantMessage.content = assistantContent
-            assistantMessage.sourceType = data.source_type || 'llm'
-          }
-          if (data.error) {
-            error.value = data.error
-            if (!assistantMessage) {
-              assistantMessage = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: '',
-                sourceType: 'error',
-                createdAt: new Date().toISOString(),
-              }
-              messages.value.push(assistantMessage)
-            }
-            assistantMessage.content = assistantContent + `\n\n错误: ${data.error}`
-          }
-        } catch (_) {
-          /* ignore unparseable line */
-        }
-      }
-
-      // 【诊断模式】用 response.text() 获取完整响应，确认数据是否完整到达
+      // 服务端返回纯 JSON，不再使用 SSE
       const response = await chatApi.sendMessage({
         message,
         conversationId: currentConversationId.value,
       }, abortController.signal)
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || `HTTP ${response.status}`)
       }
 
-      const fullText = await response.text()
-      console.log('[诊断] 完整响应到达:', fullText.length, 'bytes')
+      const data = await response.json()
 
-      // 解析完整的 SSE 文本
-      const lines = fullText.split('\n')
-      for (const line of lines) {
-        processLine(line.trim())
+      if (data.error) {
+        error.value = data.error
       }
 
-      if (assistantMessage) {
-        assistantMessage.sourceType = assistantMessage.sourceType || 'llm'
-      } else {
-        console.warn('[SSE] 未解析到任何内容, 原始响应:', buffer || '(empty)')
-        messages.value.push({
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: '未收到有效回复，请重试。',
-          createdAt: new Date().toISOString(),
-        })
-      }
+      messages.value.push({
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: data.content || '',
+        sourceType: data.source_type || 'llm',
+        sources: data.sources || [],
+        createdAt: new Date().toISOString(),
+      })
 
     } catch (e) {
       if (e.name === 'AbortError') {
