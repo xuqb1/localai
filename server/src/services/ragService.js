@@ -76,16 +76,15 @@ export class RAGService {
 
   async addCsvDocumentByLines(filePath, onProgress) {
     const existingDoc = this.documentRepository.findByFilePath(filePath)
-    if (existingDoc) {
-      await vectorDb.deleteByDocumentId(existingDoc.id)
-    }
-
     const ext = path.extname(filePath).toLowerCase()
     const title = path.basename(filePath, ext)
 
     let doc
+    let startCount = 0
+    
     if (existingDoc) {
       doc = existingDoc
+      startCount = existingDoc.chunk_count || 0
       this.documentRepository.update(doc.id, {
         title,
         content: `CSV文件: ${title}`,
@@ -102,16 +101,43 @@ export class RAGService {
       })
     }
 
+    this.documentRepository.updateImportStatus(doc.id, 'importing', startCount > 0 ? 1 : 0)
+
     const readline = await import('readline')
     const fs = await import('fs')
     
-    const stat = fs.default.statSync(filePath)
-    const totalSize = stat.size
+    let totalLines = existingDoc?.total_lines || 0
     
-    let count = 0
+    if (totalLines === 0) {
+      let rlCount = readline.createInterface({
+        input: fs.default.createReadStream(filePath),
+        crlfDelay: Infinity,
+      })
+      
+      for await (const line of rlCount) {
+        if (line.trim()) {
+          totalLines++
+        }
+      }
+      
+      this.documentRepository.updateTotalLines(doc.id, totalLines)
+    }
+    
+    const actualTotalLines = totalLines - 1
+    
+    if (startCount > 0) {
+      if (onProgress) {
+        onProgress(Math.round((startCount / actualTotalLines) * 100), `检测到断点，从第 ${startCount} 行继续导入...`)
+      }
+    } else {
+      if (onProgress) {
+        onProgress(0, `总行数: ${totalLines}，将导入全部行...`)
+      }
+    }
+    
+    let count = startCount
     let lineNum = 0
     let headers = []
-    let bytesRead = 0
     let batchLines = []
     const batchSize = 1000
     
@@ -123,7 +149,6 @@ export class RAGService {
     })
     
     for await (const line of rl) {
-      bytesRead += line.length + 2
       const trimmedLine = line.trim()
       if (!trimmedLine) continue
       
@@ -134,7 +159,11 @@ export class RAGService {
       } else {
         const lineText = parts.join(' ')
         if (lineText && lineText.trim().length > 0) {
-          batchLines.push(lineText)
+          if (count >= startCount) {
+            batchLines.push(lineText)
+          } else {
+            count++
+          }
         }
       }
       
@@ -143,9 +172,12 @@ export class RAGService {
         count += batchLines.length
         batchLines = []
         
+        const progress = Math.min(99, Math.round((count / actualTotalLines) * 100))
+        this.documentRepository.updateImportStatus(doc.id, 'importing', progress)
+        this.documentRepository.updateChunkCount(doc.id, count)
+        
         if (onProgress) {
-          const progress = Math.min(95, Math.round((bytesRead / totalSize) * 100))
-          onProgress(progress, `已处理 ${count} 行`)
+          onProgress(progress, `已处理 ${count} / ${actualTotalLines} 行`)
         }
       }
       
@@ -160,9 +192,12 @@ export class RAGService {
     await vectorDb.endBatchMode()
 
     this.documentRepository.updateChunkCount(doc.id, count)
+    this.documentRepository.updateImportStatus(doc.id, 'completed', 100)
+    
+    const message = `导入完成，共 ${count} / ${totalLines} 行`
     
     if (onProgress) {
-      onProgress(100, `导入完成，共 ${count} 行`)
+      onProgress(100, message)
     }
 
     return {

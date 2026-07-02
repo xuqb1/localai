@@ -17,6 +17,56 @@ export class LLMService {
     }
   }
 
+  getProvider(model, settings = null) {
+    let provider = null
+    let providerType = model
+    
+    if (this.providers[model]) {
+      provider = { ...this.providers[model] }
+    } else if (settings && settings.customProviders) {
+      const customProvider = settings.customProviders.find(p => p.name === model)
+      if (customProvider) {
+        provider = {
+          apiKey: customProvider.apiKey,
+          baseURL: customProvider.apiUrl,
+          model: customProvider.model,
+        }
+        return provider
+      }
+    }
+    
+    if (!provider && settings && settings.defaultModel) {
+      providerType = settings.defaultModel
+      if (this.providers[providerType]) {
+        provider = { ...this.providers[providerType] }
+      } else if (settings.customProviders) {
+        const customProvider = settings.customProviders.find(p => p.name === providerType)
+        if (customProvider) {
+          provider = {
+            apiKey: customProvider.apiKey,
+            baseURL: customProvider.apiUrl,
+            model: customProvider.model,
+          }
+          return provider
+        }
+      }
+    }
+    
+    if (provider && settings) {
+      if (providerType === 'agnes') {
+        provider.apiKey = settings.agnesApiKey || provider.apiKey
+        provider.baseURL = settings.agnesApiUrl || provider.baseURL
+        provider.model = settings.agnesModel || provider.model
+      } else if (providerType === 'deepseek') {
+        provider.apiKey = settings.deepseekApiKey || provider.apiKey
+        provider.baseURL = settings.deepseekApiUrl || provider.baseURL
+        provider.model = settings.deepseekModel || provider.model
+      }
+    }
+    
+    return provider
+  }
+
   async generateResponse(prompt, options = {}) {
     const { 
       model = 'deepseek', 
@@ -28,15 +78,7 @@ export class LLMService {
       maxRetries = 3 // 增加重试次数
     } = options
     
-    let provider = { ...this.providers[model] }
-    
-    if (settings) {
-      if (model === 'agnes') {
-        provider.apiKey = settings.agnesApiKey || provider.apiKey
-      } else if (model === 'deepseek') {
-        provider.apiKey = settings.deepseekApiKey || provider.apiKey
-      }
-    }
+    const provider = this.getProvider(model, settings)
 
     if (!provider || !provider.apiKey) {
       throw new Error(`模型 ${model} 的 API Key 未配置`)
@@ -177,10 +219,11 @@ export class LLMService {
       model = 'deepseek', 
       temperature = 0.7, 
       maxTokens = 4096,
-      timeout = 120000 // 2分钟超时
+      timeout = 120000, // 2分钟超时
+      settings = null
     } = options
     
-    const provider = this.providers[model]
+    const provider = this.getProvider(model, settings)
 
     if (!provider || !provider.apiKey) {
       throw new Error(`模型 ${model} 的 API Key 未配置`)

@@ -81,6 +81,15 @@ export class DocumentRepository {
     const now = formatDate(new Date())
     db.prepare('UPDATE documents SET chunk_count = ?, updated_at = ? WHERE id = ?').run([count, now, id])
   }
+
+  updateImportStatus(id, status, progress) {
+    const now = formatDate(new Date())
+    db.prepare('UPDATE documents SET import_status = ?, import_progress = ?, updated_at = ? WHERE id = ?').run([status, progress, now, id])
+  }
+
+  updateTotalLines(id, totalLines) {
+    db.prepare('UPDATE documents SET total_lines = ? WHERE id = ?').run([totalLines, id])
+  }
 }
 
 export class ConversationRepository {
@@ -138,7 +147,12 @@ export class SettingsRepository {
     if (!settings) {
       return {
         agnesApiKey: '',
+        agnesApiUrl: 'https://api.agnes.cn',
+        agnesModel: 'agnes-3.5-turbo',
         deepseekApiKey: '',
+        deepseekApiUrl: 'https://api.deepseek.com',
+        deepseekModel: 'deepseek-chat',
+        customProviders: [],
         defaultModel: 'deepseek',
         temperature: 0.7,
         maxTokens: 4096,
@@ -147,7 +161,12 @@ export class SettingsRepository {
     }
     return {
       agnesApiKey: settings.agnes_api_key || '',
+      agnesApiUrl: settings.agnes_api_url || 'https://api.agnes.cn',
+      agnesModel: settings.agnes_model || 'agnes-3.5-turbo',
       deepseekApiKey: settings.deepseek_api_key || '',
+      deepseekApiUrl: settings.deepseek_api_url || 'https://api.deepseek.com',
+      deepseekModel: settings.deepseek_model || 'deepseek-chat',
+      customProviders: settings.custom_providers ? JSON.parse(settings.custom_providers) : [],
       defaultModel: settings.default_model || 'deepseek',
       temperature: settings.temperature || 0.7,
       maxTokens: settings.max_tokens || 4096,
@@ -159,12 +178,19 @@ export class SettingsRepository {
     const now = formatDate(new Date())
     db.prepare(`
       UPDATE settings 
-      SET agnes_api_key = ?, deepseek_api_key = ?, default_model = ?, 
+      SET agnes_api_key = ?, agnes_api_url = ?, agnes_model = ?,
+          deepseek_api_key = ?, deepseek_api_url = ?, deepseek_model = ?,
+          custom_providers = ?, default_model = ?, 
           temperature = ?, max_tokens = ?, vector_db_path = ?, updated_at = ?
       WHERE id = 1
     `).run([
       settings.agnesApiKey || '',
+      settings.agnesApiUrl || 'https://api.agnes.cn',
+      settings.agnesModel || 'agnes-3.5-turbo',
       settings.deepseekApiKey || '',
+      settings.deepseekApiUrl || 'https://api.deepseek.com',
+      settings.deepseekModel || 'deepseek-chat',
+      JSON.stringify(settings.customProviders || []),
       settings.defaultModel || 'deepseek',
       settings.temperature || 0.7,
       settings.maxTokens || 4096,

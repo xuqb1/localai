@@ -27,7 +27,7 @@ function toggleCollapse() {
       :class="isCollapsed ? 'w-18' : 'w-64'"
     >
       <div class="p-4 border-b border-slate-700">
-        <h1 class="text-xl font-bold text-cyan-500 flex items-center gap-2" :class="isCollapsed?'justify-center':''">
+        <h1 class="text-xl font-bold text-cyan-500 flex items-center gap-2" :class="isCollapsed?'justify-center':'px-2'">
           <MessageCircle :size="24" />
           <span v-if="!isCollapsed">LocalAI</span>
         </h1>

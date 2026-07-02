@@ -107,6 +107,11 @@ async function pollTaskStatus(taskId) {
  let pollInterval = setInterval(async () => {
  try {
  const task = await documentsApi.getImportTask(taskId);
+ if (!task || task.error === '任务不存在') {
+ clearInterval(pollInterval);
+ console.log('任务不存在，停止轮询');
+ return;
+ }
  if (task.status === 'completed') {
  clearInterval(pollInterval);
  showToast('success', task.message || '导入完成');
@@ -116,8 +121,13 @@ async function pollTaskStatus(taskId) {
  showToast('error', task.message || '导入失败');
  } else if (task.status === 'running') {
  console.log(`导入进度: ${task.progress}% - ${task.message}`);
+ await documentStore.fetchDocuments();
  }
  } catch (e) {
+ if (e.response && e.response.status === 404) {
+ clearInterval(pollInterval);
+ return;
+ }
  console.error('查询任务状态失败:', e);
  }
  }, 3000);
@@ -231,6 +241,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
             <th class="px-6 py-3 text-left text-sm font-medium text-slate-300">类型</th>
             <th class="px-6 py-3 text-left text-sm font-medium text-slate-300">分块数</th>
             <th class="px-6 py-3 text-left text-sm font-medium text-slate-300">状态</th>
+            <th class="px-6 py-3 text-left text-sm font-medium text-slate-300">进度</th>
             <th class="px-6 py-3 text-left text-sm font-medium text-slate-300">创建时间</th>
             <th class="px-6 py-3 text-left text-sm font-medium text-slate-300">操作</th>
           </tr>
@@ -244,10 +255,26 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
               <span 
                 :class="[
                   'px-2 py-1 rounded text-xs font-medium',
-                  (doc.chunk_count && doc.chunk_count > 0) ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                  doc.import_status === 'importing' ? 'bg-yellow-500/20 text-yellow-400' : '',
+                  doc.import_status === 'completed' ? 'bg-green-500/20 text-green-400' : '',
+                  (!doc.import_status || doc.import_status === 'unknown') ? 'bg-red-500/20 text-red-400' : ''
                 ]"
               >
-                {{ (doc.chunk_count && doc.chunk_count > 0) ? '已导入' : '导入中' }}
+                {{ doc.import_status === 'importing' ? '导入中' : (doc.import_status === 'completed' ? '已导入' : '未知') }}
+              </span>
+            </td>
+            <td class="px-6 py-4">
+              <div v-if="doc.import_status === 'importing'" class="flex flex-col gap-1">
+                <span class="text-slate-300 text-sm">{{ doc.chunk_count || 0 }} / {{ doc.total_lines || 0 }}</span>
+                <div class="w-full bg-slate-700 rounded-full h-1.5">
+                  <div 
+                    class="bg-yellow-500 h-1.5 rounded-full transition-all duration-300"
+                    :style="{ width: `${doc.import_progress || 0}%` }"
+                  ></div>
+                </div>
+              </div>
+              <span v-else class="text-slate-400 text-sm">
+                {{ doc.chunk_count || 0 }} 行
               </span>
             </td>
             <td class="px-6 py-4 text-slate-400 text-sm">{{ formatDate(doc.created_at) }}</td>

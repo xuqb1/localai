@@ -5,7 +5,12 @@ import { settingsApi } from '../api'
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref({
     agnesApiKey: '',
+    agnesApiUrl: 'https://api.agnes.cn',
+    agnesModel: 'agnes-3.5-turbo',
     deepseekApiKey: '',
+    deepseekApiUrl: 'https://api.deepseek.com',
+    deepseekModel: 'deepseek-chat',
+    customProviders: [],
     defaultModel: 'deepseek',
     temperature: 0.7,
     maxTokens: 4096,

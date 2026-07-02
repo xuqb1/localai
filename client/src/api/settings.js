@@ -8,4 +8,8 @@ export const settingsApi = {
   update(data) {
     return axios.put('/settings', data)
   },
+
+  getModels(provider, apiKey, apiUrl) {
+    return axios.post('/settings/models', { provider, apiKey, apiUrl })
+  },
 }

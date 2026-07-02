@@ -35,7 +35,8 @@ LocalAI 是一个基于本地知识库的智能问答系统，支持多种文档
 ### 后端
 - **Node.js** - JavaScript 运行环境
 - **Express** - Web 应用框架
-- **hnswlib-node** - 高性能向量索引库
+- **Qdrant** - 高性能向量数据库（默认）
+- **hnswlib-node** - 本地向量索引库（可选回退）
 - **better-sqlite3** - 轻量级数据库
 - **Axios** - HTTP 客户端
 
@@ -48,9 +49,9 @@ LocalAI 是一个基于本地知识库的智能问答系统，支持多种文档
 - **Lucide Vue** - 图标库
 
 ### 向量化与 AI
-- **HNSW** - 近似最近邻搜索算法
+- **Qdrant** - 高性能向量数据库，支持本地 / Docker / 云部署
 - **DeepSeek API** - 大语言模型
-- **本地向量存储** - 数据本地化，保护隐私
+- **向量语义检索** - 基于向量相似度的智能文档检索
 
 ## 📦 快速开始
 
@@ -58,6 +59,7 @@ LocalAI 是一个基于本地知识库的智能问答系统，支持多种文档
 
 - Node.js >= 18.0.0
 - npm >= 9.0.0
+- Qdrant 向量数据库（推荐使用 Docker 快速部署）
 
 ### 安装步骤
 
@@ -73,13 +75,19 @@ cd server
 npm install
 ```
 
-3. **安装前端依赖**
+3. **启动 Qdrant 向量数据库**（推荐使用 Docker）
+```bash
+docker run -d --name qdrant -p 6333:6333 -v qdrant_storage:/qdrant/storage qdrant/qdrant
+```
+> 也可以使用已有的 Qdrant 服务或云托管版本。若不想部署 Qdrant，可设置 `VECTOR_DB_TYPE=hnswlib` 回退到本地模式。
+
+4. **安装前端依赖**
 ```bash
 cd ../client
 npm install
 ```
 
-4. **配置环境变量**
+5. **配置环境变量**
 创建 server/.env 文件：
 ```env
 # DeepSeek API
@@ -90,12 +98,19 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 AGNES_API_KEY=your_agnes_api_key
 AGNES_BASE_URL=https://api.agnes.ai/v1
 
+# 向量数据库配置
+VECTOR_DB_TYPE=qdrant
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
+QDRANT_API_KEY=
+QDRANT_COLLECTION=localai_documents
+
 # 服务器配置
 PORT=3001
 NODE_ENV=development
 ```
 
-5. **启动服务**
+6. **启动服务**
 启动后端：
 ```bash
 cd server
@@ -107,7 +122,7 @@ cd client
 npm run dev
 ```
 
-6. **访问应用**
+7. **访问应用**
 
 打开浏览器访问 http://localhost:5173
 
@@ -162,6 +177,8 @@ GitHub：https://github.com/xuqb1
 
 ### 🙏 致谢
 DeepSeek - 提供强大的大语言模型
+
+Qdrant - 高性能向量数据库
 
 hnswlib - 高性能向量搜索库
 

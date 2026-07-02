@@ -15,6 +15,13 @@ export default {
     },
     vector: {
       path: process.env.VECTOR_DB_PATH || './data/vector_db',
+      type: process.env.VECTOR_DB_TYPE || 'qdrant',
+    },
+    qdrant: {
+      host: process.env.QDRANT_HOST || 'localhost',
+      port: parseInt(process.env.QDRANT_PORT) || 6333,
+      apiKey: process.env.QDRANT_API_KEY || null,
+      collectionName: process.env.QDRANT_COLLECTION || 'localai_documents',
     },
   },
   embedding: {
@@ -24,7 +31,7 @@ export default {
     providers: {
       agnes: {
         apiKey: process.env.AGNES_API_KEY,
-        baseURL: process.env.AGNES_BASE_URL || 'https://api.agnes.cn/v1',
+        baseURL: process.env.AGNES_BASE_URL || 'https://apihub.agnes-ai.com/v1',
       },
       deepseek: {
         apiKey: process.env.DEEPSEEK_API_KEY,

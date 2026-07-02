@@ -35,7 +35,8 @@ LocalAI is an intelligent Q&A system based on a local knowledge base. It support
 ### Backend
 - **Node.js** - JavaScript runtime
 - **Express** - Web framework
-- **hnswlib-node** - High-performance vector index
+- **Qdrant** - High-performance vector database (default)
+- **hnswlib-node** - Local vector index library (optional fallback)
 - **better-sqlite3** - Lightweight database
 - **Axios** - HTTP client
 
@@ -48,9 +49,9 @@ LocalAI is an intelligent Q&A system based on a local knowledge base. It support
 - **Lucide Vue** - Icon library
 
 ### Vectorization & AI
-- **HNSW** - Approximate nearest neighbor search
+- **Qdrant** - High-performance vector database, supports local / Docker / cloud deployment
 - **DeepSeek API** - Large language model
-- **Local Vector Storage** - Data localization for privacy
+- **Semantic Vector Retrieval** - Intelligent document search via vector similarity
 
 ## 📦 Quick Start
 
@@ -58,25 +59,35 @@ LocalAI is an intelligent Q&A system based on a local knowledge base. It support
 
 - Node.js >= 18.0.0
 - npm >= 9.0.0
+- Qdrant vector database (recommended quick deploy via Docker)
 
 ### Installation
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/localai.git
+git clone https://github.com/xuqb1/localai.git
 cd localai
 ```
-Install backend dependencies
+
+2. **Install backend dependencies**
 ```bash
 cd server
 npm install
 ```
-Install frontend dependencies
+
+3. **Start Qdrant vector database** (recommended via Docker)
+```bash
+docker run -d --name qdrant -p 6333:6333 -v qdrant_storage:/qdrant/storage qdrant/qdrant
+```
+> You can also use an existing Qdrant service or cloud-hosted version. If you prefer not to deploy Qdrant, set `VECTOR_DB_TYPE=hnswlib` to fallback to local mode.
+
+4. **Install frontend dependencies**
 ```bash
 cd ../client
 npm install
 ```
-Configure environment variables
+
+5. **Configure environment variables**
 
 Create server/.env file:
 
@@ -88,6 +99,13 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 # Agnes API (optional)
 AGNES_API_KEY=your_agnes_api_key
 AGNES_BASE_URL=https://api.agnes.ai/v1
+
+# Vector database configuration
+VECTOR_DB_TYPE=qdrant
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
+QDRANT_API_KEY=
+QDRANT_COLLECTION=localai_documents
 
 # Server configuration
 PORT=3001
@@ -153,6 +171,8 @@ GitHub: https://github.com/xuqb1
 
 ## 🙏 Acknowledgments
 DeepSeek - Powerful LLM
+
+Qdrant - High-performance vector database
 
 hnswlib - High-performance vector search
 

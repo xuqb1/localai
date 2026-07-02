@@ -63,6 +63,38 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation
 
 db.exec(createTables)
 
+try {
+  db.exec('ALTER TABLE documents ADD COLUMN import_status TEXT DEFAULT "completed"')
+} catch (e) {}
+
+try {
+  db.exec('ALTER TABLE documents ADD COLUMN import_progress INTEGER DEFAULT 0')
+} catch (e) {}
+
+try {
+  db.exec('ALTER TABLE documents ADD COLUMN total_lines INTEGER DEFAULT 0')
+} catch (e) {}
+
+try {
+  db.exec('ALTER TABLE settings ADD COLUMN agnes_api_url TEXT DEFAULT "https://api.agnes.cn"')
+} catch (e) {}
+
+try {
+  db.exec('ALTER TABLE settings ADD COLUMN agnes_model TEXT DEFAULT "agnes-3.5-turbo"')
+} catch (e) {}
+
+try {
+  db.exec('ALTER TABLE settings ADD COLUMN deepseek_api_url TEXT DEFAULT "https://api.deepseek.com"')
+} catch (e) {}
+
+try {
+  db.exec('ALTER TABLE settings ADD COLUMN deepseek_model TEXT DEFAULT "deepseek-chat"')
+} catch (e) {}
+
+try {
+  db.exec('ALTER TABLE settings ADD COLUMN custom_providers TEXT DEFAULT "[]"')
+} catch (e) {}
+
 const checkSettings = db.prepare('SELECT COUNT(*) as count FROM settings')
 const result = checkSettings.get()
 if (result.count === 0) {

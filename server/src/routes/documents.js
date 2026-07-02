@@ -176,46 +176,70 @@ router.post('/documents/import-directory', async (req, res) => {
       return res.status(400).json({ error: '指定的路径不是目录' })
     }
 
-    const supportedExts = ['.txt', '.docx', '.html', '.csv']
+    const supportedExts = ['.txt', '.docx', '.doc', '.html', '.csv', '.css', '.js', '.svg', '.md', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']
     const allFiles = getAllFiles(directoryPath, supportedExts)
     
     if (allFiles.length === 0) {
       return res.json({
+        success: true,
         importedCount: 0,
-        imported: [],
-        skippedCount: 0,
-        skipped: [],
         message: '未找到支持的文件类型',
       })
     }
-    
-    const imported = []
-    const skipped = []
-    const batchSize = 10
 
-    for (let i = 0; i < allFiles.length; i += batchSize) {
-      const batch = allFiles.slice(i, i + batchSize)
+    const task = taskManager.createTask('import_directory', {
+      directoryPath,
+      totalFiles: allFiles.length,
+    })
+
+    taskManager.executeTask(task.id, async (taskId, updateProgress) => {
+      updateProgress(0, `开始导入目录: ${directoryPath}，共 ${allFiles.length} 个文件`)
       
-      for (const filePath of batch) {
+      const imported = []
+      const skipped = []
+
+      for (let i = 0; i < allFiles.length; i++) {
+        const filePath = allFiles[i]
         const fileName = path.relative(directoryPath, filePath)
+        const ext = path.extname(filePath).toLowerCase()
 
         try {
-          const doc = await ragService.addDocument(filePath)
-          imported.push({ name: fileName, id: doc.id })
+          let result
+          if (ext === '.csv') {
+            result = await ragService.addCsvDocumentByLines(filePath, (progress, msg) => {
+              const fileProgress = Math.round((i / allFiles.length) * 100)
+              updateProgress(fileProgress, `${fileName}: ${msg}`)
+            })
+          } else {
+            result = await ragService.addDocument(filePath)
+          }
+          imported.push({ name: fileName, id: result.id })
         } catch (e) {
           skipped.push(`${fileName} (${e.message})`)
         }
+        
+        const progress = Math.round(((i + 1) / allFiles.length) * 100)
+        updateProgress(progress, `已导入 ${imported.length} / ${allFiles.length} 个文件，跳过 ${skipped.length} 个`)
       }
-      
-      await new Promise(resolve => setTimeout(resolve, 100))
-    }
+
+      taskManager.updateTask(taskId, {
+        status: 'completed',
+        progress: 100,
+        message: `目录导入完成，成功 ${imported.length} 个，跳过 ${skipped.length} 个`,
+        result: {
+          importedCount: imported.length,
+          skippedCount: skipped.length,
+          totalFiles: allFiles.length,
+          imported,
+          skipped,
+        },
+      })
+    })
 
     res.json({
-      importedCount: imported.length,
-      imported,
-      skippedCount: skipped.length,
-      skipped,
-      totalFiles: allFiles.length,
+      success: true,
+      taskId: task.id,
+      message: `导入任务已提交，共 ${allFiles.length} 个文件，请稍后查询任务状态`,
     })
   } catch (e) {
     console.error('导入目录错误:', e)
