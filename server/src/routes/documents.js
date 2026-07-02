@@ -176,7 +176,7 @@ router.post('/documents/import-directory', async (req, res) => {
       return res.status(400).json({ error: '指定的路径不是目录' })
     }
 
-    const supportedExts = ['.txt', '.docx', '.doc', '.html', '.csv', '.css', '.js', '.svg', '.md', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']
+    const supportedExts = ['.txt', '.docx', '.doc', '.xlsx', '.xls', '.html', '.csv', '.css', '.js', '.svg', '.md', '.c', '.cpp', '.h', '.hpp', '.bas', '.inc', '.rc', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']
     const allFiles = getAllFiles(directoryPath, supportedExts)
     
     if (allFiles.length === 0) {

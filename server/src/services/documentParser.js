@@ -28,6 +28,23 @@ export class DocumentParser {
         return await this.parseTextFile(filePath, 'js')
       case '.svg':
         return await this.parseTextFile(filePath, 'svg')
+      case '.c':
+        return await this.parseTextFile(filePath, 'c')
+      case '.cpp':
+        return await this.parseTextFile(filePath, 'cpp')
+      case '.h':
+        return await this.parseTextFile(filePath, 'h')
+      case '.hpp':
+        return await this.parseTextFile(filePath, 'hpp')
+      case '.bas':
+        return await this.parseTextFile(filePath, 'bas')
+      case '.inc':
+        return await this.parseTextFile(filePath, 'inc')
+      case '.rc':
+        return await this.parseTextFile(filePath, 'rc')
+      case '.xlsx':
+      case '.xls':
+        return await this.parseExcel(filePath)
       case '.jpg':
       case '.jpeg':
       case '.png':
@@ -170,6 +187,38 @@ export class DocumentParser {
     const sizes = ['B', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  async parseExcel(filePath) {
+    const XLSX = await import('xlsx')
+    const ext = path.extname(filePath).toLowerCase()
+    const title = path.basename(filePath, ext)
+
+    let content = `Excel 文件: ${path.basename(filePath)}\n`
+
+    try {
+      const workbook = XLSX.default.readFile(filePath)
+      const sheetNames = workbook.SheetNames
+
+      content += `工作表数量: ${sheetNames.length}\n`
+
+      for (const sheetName of sheetNames) {
+        const sheet = workbook.Sheets[sheetName]
+        const sheetData = XLSX.default.utils.sheet_to_csv(sheet)
+
+        content += `\n--- 工作表: ${sheetName} ---\n`
+        content += sheetData
+      }
+    } catch (e) {
+      const raw = await this.readFileWithEncoding(filePath)
+      content += raw
+    }
+
+    return {
+      content,
+      title,
+      fileType: 'excel',
+    }
   }
 
   async parseHtml(filePath) {

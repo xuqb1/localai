@@ -1,6 +1,7 @@
 import config from '../config/index.js'
 import fs from 'fs/promises'
 import path from 'path'
+import embeddingService from '../services/embeddingService.js'
 
 class VectorRepository {
   constructor() {
