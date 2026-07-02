@@ -90,6 +90,10 @@ export class DocumentRepository {
   updateTotalLines(id, totalLines) {
     db.prepare('UPDATE documents SET total_lines = ? WHERE id = ?').run([totalLines, id])
   }
+
+  findImportingDocuments() {
+    return db.prepare("SELECT * FROM documents WHERE import_status = 'importing'").all()
+  }
 }
 
 export class ConversationRepository {

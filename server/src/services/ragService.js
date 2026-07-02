@@ -135,7 +135,7 @@ export class RAGService {
       }
     }
     
-    let count = startCount
+    let count = 0
     let lineNum = 0
     let headers = []
     let batchLines = []

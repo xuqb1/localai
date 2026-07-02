@@ -24,9 +24,25 @@ const isRefreshing = ref(false);
 const showImportFileModal = ref(false);
 const importFolderPath = ref('');
 const importFileName = ref('');
+let autoRefreshTimer = null
 onMounted(() => {
- documentStore.fetchDocuments();
+ documentStore.fetchDocuments().then(() => {
+  startAutoRefreshIfNeeded()
+ });
 });
+function startAutoRefreshIfNeeded() {
+ const hasImporting = documentStore.documents.some(d => d.import_status === 'importing')
+ if (hasImporting && !autoRefreshTimer) {
+  autoRefreshTimer = setInterval(async () => {
+   await documentStore.fetchDocuments()
+   const stillImporting = documentStore.documents.some(d => d.import_status === 'importing')
+   if (!stillImporting) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+   }
+  }, 3000)
+ }
+}
 function handleSearch() {
  documentStore.setSearch(searchQuery.value);
 }
@@ -161,15 +177,27 @@ async function handleSaveEdit() {
  showToast('error', '更新失败：' + e.message);
  }
 }
+function formatNumber(num) {
+  if (!num && num !== 0) return '-'
+  if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T'
+  if (num >= 1e9) return (num / 1e9).toFixed(2) + 'G'
+  if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M'
+  if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K'
+  return String(num)
+}
+function formatPercent(chunkCount, totalLines) {
+  if (!totalLines || totalLines === 0) return '0.00%'
+  return ((chunkCount / totalLines) * 100).toFixed(2) + '%'
+}
 function formatDate(dateStr) {
- if (!dateStr)
- return '-';
- try {
- return new Date(dateStr).toLocaleString('zh-CN');
- }
- catch {
- return dateStr;
- }
+  if (!dateStr)
+    return '-';
+  try {
+    return new Date(dateStr).toLocaleString('zh-CN');
+  }
+  catch {
+    return dateStr;
+  }
 }
 function truncateContent(content) {
  if (!content)
@@ -265,7 +293,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
             </td>
             <td class="px-6 py-4">
               <div v-if="doc.import_status === 'importing'" class="flex flex-col gap-1">
-                <span class="text-slate-300 text-sm">{{ doc.chunk_count || 0 }} / {{ doc.total_lines || 0 }}</span>
+                <span class="text-slate-300 text-sm">{{ formatNumber(doc.chunk_count) }} / {{ formatNumber(doc.total_lines) }} ({{ formatPercent(doc.chunk_count, doc.total_lines) }})</span>
                 <div class="w-full bg-slate-700 rounded-full h-1.5">
                   <div 
                     class="bg-yellow-500 h-1.5 rounded-full transition-all duration-300"
@@ -274,7 +302,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
                 </div>
               </div>
               <span v-else class="text-slate-400 text-sm">
-                {{ doc.chunk_count || 0 }} 行
+                {{ formatNumber(doc.chunk_count) }} 行
               </span>
             </td>
             <td class="px-6 py-4 text-slate-400 text-sm">{{ formatDate(doc.created_at) }}</td>

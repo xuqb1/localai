@@ -6,6 +6,7 @@ import documentsRouter from './src/routes/documents.js'
 import settingsRouter from './src/routes/settings.js'
 import { errorHandler } from './src/middleware/errorHandler.js'
 import vectorDb from './src/repositories/vectorDb.js'
+import { RAGService } from './src/services/ragService.js'
 
 const app = express()
 const PORT = config.server.port
@@ -45,6 +46,39 @@ async function startServer() {
     console.log(`LocalAI 后端服务已启动，监听端口: ${PORT}`)
     console.log(`API 地址: http://localhost:${PORT}`)
   })
+
+  // 自动恢复中断的导入任务
+  await resumeImportingDocuments()
+}
+
+async function resumeImportingDocuments() {
+  try {
+    const ragService = new RAGService()
+    const importingDocs = ragService.documentRepository.findImportingDocuments()
+    
+    if (importingDocs.length === 0) return
+    
+    console.log(`检测到 ${importingDocs.length} 个未完成的导入任务，自动恢复中...`)
+    
+    for (const doc of importingDocs) {
+      if (!doc.file_path) {
+        ragService.documentRepository.updateImportStatus(doc.id, 'completed', 100)
+        console.log(`文档 ${doc.title} 无文件路径，标记为已完成`)
+        continue
+      }
+      
+      console.log(`恢复导入: ${doc.title}, 从第 ${doc.chunk_count || 0} 行继续...`)
+      
+      ragService.addCsvDocumentByLines(doc.file_path).then(() => {
+        console.log(`✅ 导入完成: ${doc.title}`)
+      }).catch(err => {
+        console.error(`❌ 导入失败: ${doc.title}`, err.message)
+        ragService.documentRepository.updateImportStatus(doc.id, 'failed', 0)
+      })
+    }
+  } catch (e) {
+    console.warn('恢复导入任务出错:', e.message)
+  }
 }
 
 startServer()
