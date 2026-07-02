@@ -73,8 +73,10 @@ ${knowledgeResult.context}
 
     // 客户端断开连接时，尝试保存已获取的内容
     let fullContent = ''
+    let isSaved = false // 防止 res.end() 触发 close 事件导致重复保存
     const handleClientClose = () => {
-      if (fullContent) {
+      if (fullContent && !isSaved) {
+        isSaved = true
         try {
           messageRepository.create(conversationId, 'assistant', fullContent, sourceType)
         } catch (e) {
@@ -226,7 +228,10 @@ ${knowledgeResult.context}
       console.warn('警告: 流式响应内容为空! upstreamError:', upstreamError?.message)
     }
 
-    messageRepository.create(conversationId, 'assistant', fullContent, sourceType)
+    if (!isSaved) {
+      isSaved = true
+      messageRepository.create(conversationId, 'assistant', fullContent, sourceType)
+    }
     res.end()
   } catch (e) {
     console.error('聊天请求失败:', e)

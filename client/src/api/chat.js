@@ -9,12 +9,34 @@ export const chatApi = {
     return axios.get(`/chat/history/${id}`)
   },
 
-  sendMessage(data, signal) {
-    return fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      signal,
+  sendMessage(data, signal, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/chat')
+      xhr.setRequestHeader('Content-Type', 'application/json')
+
+      // 必须在 send() 之前绑定 onprogress，否则事件丢失
+      xhr.onprogress = onProgress
+
+      if (signal) {
+        signal.addEventListener('abort', () => xhr.abort())
+      }
+
+      xhr.onloadend = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(xhr)
+        } else {
+          reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`))
+        }
+      }
+      xhr.onerror = () => reject(new Error('网络请求失败'))
+      xhr.onabort = () => {
+        const err = new Error('已取消')
+        err.name = 'AbortError'
+        reject(err)
+      }
+
+      xhr.send(JSON.stringify(data))
     })
   },
 
