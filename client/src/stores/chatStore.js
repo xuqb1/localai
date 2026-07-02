@@ -126,6 +126,18 @@ export const useChatStore = defineStore('chat', () => {
           }
           if (data.error) {
             error.value = data.error
+            // 显示错误到聊天中
+            if (!assistantMessage) {
+              assistantMessage = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: '',
+                sourceType: 'error',
+                createdAt: new Date().toISOString(),
+              }
+              messages.value.push(assistantMessage)
+            }
+            assistantMessage.content = assistantContent + `\n\n⚠️ 错误: ${data.error}`
           }
         } catch (e) {
           // 忽略无法解析的 SSE 行

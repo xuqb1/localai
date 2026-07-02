@@ -131,8 +131,7 @@ export class LLMService {
             'Content-Type': 'application/json',
           },
           responseType: streaming ? 'stream' : 'json',
-          timeout: currentTimeout,
-          maxRedirects: 0,
+          timeout: streaming ? 0 : currentTimeout,  // 流式请求不限时，避免长文本被掐断
           // 优化：增加这些配置提高稳定性
           maxContentLength: Infinity,
           maxBodyLength: Infinity,

@@ -87,6 +87,13 @@ ${knowledgeResult.context}
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
     res.setHeader('Cache-Control', 'no-cache')
     res.setHeader('Connection', 'keep-alive')
+    res.setHeader('X-Accel-Buffering', 'no')  // 禁用 nginx 缓冲
+    // 增加 TCP 心跳，用 comment 行保持连接
+    const keepAliveInterval = setInterval(() => {
+      if (res.writable) {
+        res.write(': keepalive\n\n')
+      }
+    }, 15000)
 
     const llmResponse = await llmService.generateResponse(prompt, {
       model: targetModel,
@@ -97,39 +104,79 @@ ${knowledgeResult.context}
       conversationHistory: recentHistory,
     })
 
+    // 监听上游流错误
+    let upstreamError = null
+    llmResponse.data.on('error', (err) => {
+      upstreamError = err
+      console.error('LLM 上游流错误:', err.message)
+    })
+
     const decoder = new TextDecoder('utf-8', { stream: true })
     let buffer = ''
 
-    for await (const chunk of llmResponse.data) {
-      const text = decoder.decode(chunk, { stream: true })
-      buffer += text
+    try {
+      for await (const chunk of llmResponse.data) {
+        const text = decoder.decode(chunk, { stream: true })
+        buffer += text
 
-      // 按行分割，保留不完整的行在 buffer 中
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
+        // 按行分割，保留不完整的行在 buffer 中
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const dataStr = line.slice(6).trim()
-          if (dataStr === '[DONE]') {
-            continue
-          }
-          try {
-            const data = JSON.parse(dataStr)
-            if (data.choices && data.choices[0] && data.choices[0].delta) {
-              const content = data.choices[0].delta.content || ''
-              fullContent += content
-
-              res.write(`data: ${JSON.stringify({
-                content,
-                source_type: sourceType,
-                sources,
-              })}\n\n`)
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim()
+            if (dataStr === '[DONE]') {
+              console.log('LLM 流式响应完成 [DONE]')
+              continue
             }
-          } catch (e) {
-            console.error('解析流式响应失败:', e)
+            try {
+              const data = JSON.parse(dataStr)
+              // 检查 LLM 返回的错误
+              if (data.error) {
+                console.error('LLM API 返回错误:', JSON.stringify(data.error))
+                if (res.writable) {
+                  res.write(`data: ${JSON.stringify({
+                    content: '',
+                    error: data.error.message || '模型服务返回错误',
+                    source_type: 'error',
+                  })}\n\n`)
+                }
+                break
+              }
+              if (data.choices && data.choices[0]) {
+                const delta = data.choices[0].delta || {}
+                const content = delta.content || ''
+                if (content) {
+                  fullContent += content
+                  if (res.writable) {
+                    res.write(`data: ${JSON.stringify({
+                      content,
+                      source_type: sourceType,
+                      sources,
+                    })}\n\n`)
+                  }
+                }
+              }
+              // 记录异常的 finish_reason
+              const finishReason = data.choices?.[0]?.finish_reason
+              if (finishReason && finishReason !== 'stop' && finishReason !== 'length') {
+                console.warn('异常 finish_reason:', finishReason)
+              }
+            } catch (e) {
+              console.error('解析流式响应失败:', e, '原始数据:', dataStr.substring(0, 200))
+            }
           }
         }
+      }
+    } catch (streamErr) {
+      console.error('流式读取异常:', streamErr.message)
+      if (res.writable) {
+        res.write(`data: ${JSON.stringify({
+          content: '',
+          error: `流式传输中断: ${streamErr.message}`,
+          source_type: 'error',
+        })}\n\n`)
       }
     }
 
@@ -141,20 +188,32 @@ ${knowledgeResult.context}
         if (dataStr !== '[DONE]') {
           try {
             const data = JSON.parse(dataStr)
-            if (data.choices && data.choices[0] && data.choices[0].delta) {
+            // 再次检查错误
+            if (data.error) {
+              console.error('LLM API 返回错误(残留):', JSON.stringify(data.error))
+            } else if (data.choices && data.choices[0] && data.choices[0].delta) {
               const content = data.choices[0].delta.content || ''
               fullContent += content
-              res.write(`data: ${JSON.stringify({
-                content,
-                source_type: sourceType,
-                sources,
-              })}\n\n`)
+              if (res.writable) {
+                res.write(`data: ${JSON.stringify({
+                  content,
+                  source_type: sourceType,
+                  sources,
+                })}\n\n`)
+              }
             }
           } catch (e) {
             console.error('解析最终流式响应失败:', e)
           }
         }
       }
+    }
+
+    clearInterval(keepAliveInterval)
+    console.log('流式响应总长度:', fullContent.length, '字符')
+
+    if (!fullContent) {
+      console.warn('警告: 流式响应内容为空! upstreamError:', upstreamError?.message)
     }
 
     messageRepository.create(conversationId, 'assistant', fullContent, sourceType)
