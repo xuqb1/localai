@@ -228,6 +228,7 @@ function statusText(status) {
   if (status === 'importing') return '导入中'
   if (status === 'completed') return '已导入'
   if (status === 'interrupted') return '已中断'
+  if (status === 'failed') return '已失败'
   return '未知'
 }
 function formatNumber(num) {
@@ -339,6 +340,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
                   doc.import_status === 'importing' ? 'bg-yellow-500/20 text-yellow-400' : '',
                   doc.import_status === 'completed' ? 'bg-green-500/20 text-green-400' : '',
                   doc.import_status === 'interrupted' ? 'bg-orange-500/20 text-orange-400' : '',
+                  doc.import_status === 'failed' ? 'bg-red-500/20 text-red-400' : '',
                   (!doc.import_status) ? 'bg-slate-500/20 text-slate-400' : ''
                 ]"
               >
@@ -355,7 +357,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
                   ></div>
                 </div>
               </div>
-              <div v-else-if="doc.import_status === 'interrupted'" class="flex flex-col gap-1">
+              <div v-else-if="doc.import_status === 'interrupted' || doc.import_status === 'failed'" class="flex flex-col gap-1">
                 <span class="text-orange-400 text-sm">{{ formatNumber(doc.chunk_count) }} / {{ formatNumber(doc.total_lines) }} ({{ formatPercent(doc.chunk_count, doc.total_lines) }})</span>
                 <span class="text-slate-500 text-xs">导入中断，可点击重新导入继续</span>
               </div>
@@ -367,7 +369,7 @@ const totalPages = computed(() => Math.ceil(documentStore.total / documentStore.
             <td class="px-6 py-4">
               <div class="flex items-center gap-2">
                 <button 
-                  v-if="doc.import_status === 'interrupted'"
+                  v-if="doc.import_status === 'interrupted' || doc.import_status === 'failed'"
                   @click="handleRetryImport(doc)"
                   :disabled="isImporting"
                   class="p-2 text-orange-400 hover:bg-orange-400/10 rounded-lg transition-colors"
